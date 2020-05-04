@@ -91,7 +91,7 @@ module['exports'] = function GigaFish(mod) {
     let toggleBait = false;
     let i = 0;
     let counterDismantle = 0;
-    mod.command.add('fisheval', (l, m, n) => {
+    mod.command.add('gigafish', (l, m, n) => {
         if (l === 'start') {
             enableFishing = true;
             load();
