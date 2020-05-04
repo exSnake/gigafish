@@ -1,0 +1,14 @@
+{
+    "disableAutoUpdate": false,
+    "disabled": false,
+    "name": "adept-rodman-evaluation",
+    "author": "Ethical Tera",
+    "description": "Automated fishing script.",
+    "version": "1.0",
+    "servers": [
+        "https://ethical-tera.com/free/adept-rodman-evaluation/"
+    ],
+    "options": {
+        "niceName": "Adept Rodman Evaluation"
+    }
+}
