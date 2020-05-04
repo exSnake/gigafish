@@ -1,14 +1,14 @@
 {
     "disableAutoUpdate": false,
     "disabled": false,
-    "name": "GigaFish",
-    "author": "",
-    "description": "Auto fishing script.",
-    "version": "0.1",
+    "name": "gigafish-evolution",
+    "author": "AgorSnake",
+    "description": "Automated fishing script.",
+    "version": "1.0",
     "servers": [
-        "https://localhost/"
+        ""
     ],
     "options": {
-        "niceName": "GigaFish"
+        "niceName": "Giga Fish"
     }
 }
