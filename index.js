@@ -31,7 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const abnormalityData = require('./data/abnormalities.json');
 
-module['exports'] = function adeptRodmanEvaluation(mod) {
+module['exports'] = function GigaFish(mod) {
 
     mod.game.initialize('inventory');
     let hooks = [];

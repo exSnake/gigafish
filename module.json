@@ -1,14 +1,14 @@
 {
     "disableAutoUpdate": false,
     "disabled": false,
-    "name": "adept-rodman-evaluation",
-    "author": "Ethical Tera",
-    "description": "Automated fishing script.",
-    "version": "1.0",
+    "name": "GigaFish",
+    "author": "",
+    "description": "Auto fishing script.",
+    "version": "0.1",
     "servers": [
-        "https://ethical-tera.com/free/adept-rodman-evaluation/"
+        "https://localhost/"
     ],
     "options": {
-        "niceName": "Adept Rodman Evaluation"
+        "niceName": "GigaFish"
     }
 }
