@@ -38,7 +38,7 @@ module['exports'] = function GigaFish(mod) {
     let config = {},
         idleCheckTimer = null,
         request = {};
-    let dismantle_contract_type = (mod.majorPatchVersion >= 85 ? 90 : 89);
+    let dismantle_contract_type = 90;
     const FILET_ID = 204052;
     const BAITS = {
         70271: 206000, // Bait I 0%
@@ -377,6 +377,20 @@ module['exports'] = function GigaFish(mod) {
     }
 
     function requestContract(type, obj) {
+/*
+        "senderName": "Andreaus",
+            "recipientName": "",
+            "data": {
+            "type": "Buffer",
+                "data": []
+        },
+        "senderId": "504543895756372270",
+            "recipientId": "0",
+            "type": 90,
+            "id": 8604870,
+            "unk3": 0,
+            "time": 0
+*/
         let contract = {
             type: type
         };
