@@ -4,7 +4,7 @@
     "name": "gigafish-evolution",
     "author": "AgorSnake",
     "description": "Automated fishing script.",
-    "version": "1.0",
+    "version": "1.1",
     "servers": [
         ""
     ],

@@ -96,6 +96,8 @@ module['exports'] = function GigaFish(mod) {
     }
     const funcLib = new (require('./lib.js'))(mod, mod['dispatch']['protocolVersion'], mod['dispatch']['cli']);
     let enableFishing = false;
+    let activeRod,
+        activeBait;
     let toggleBait = false;
     let i = 0;
     let counterDismantle = 0;
@@ -105,7 +107,7 @@ module['exports'] = function GigaFish(mod) {
         switch (key) {
             case 'enable':
                 toggleHooks();
-                mod.command.message((enableFishing = !enableFishing) ? '<font color="#00FF00">Enabled</font>' : '<font color="#FF0000">Disabled</font>');
+                mod.command.message(enableFishing ? '<font color="#00FF00">Enabled</font>' : '<font color="#FF0000">Disabled</font>');
                 mod.command.message('Manually start fishing now.');
                 break;
             case 'start':
@@ -131,8 +133,12 @@ module['exports'] = function GigaFish(mod) {
                 mod.command.message('Debug mode has been ' + (DEBUG ? 'en' : 'dis') + 'abled.');
                 break;
             case 'dismantle':case 'dismant':
-                request.action = 'dismantle';
-                processDecision();
+                if (enableFishing) {
+                    request.action = 'dismantle';
+                    makeDecision('dismantle');
+                } else {
+                    mod.command.message('First enable');
+                }
                 break;
             default:
                 mod.command.message('Incorrect command, use start/stop/debug');
@@ -144,7 +150,7 @@ module['exports'] = function GigaFish(mod) {
     async function load() {
         if (funcLib['getBaitCount']() > 0) {
             if (!toggleBait) {
-                const activeBait = funcLib['findBait']();
+                activeBait = funcLib['findBait']();
                 if (activeBait) {
                     funcLib['activateBait'](activeBait);
                     do {
@@ -160,10 +166,10 @@ module['exports'] = function GigaFish(mod) {
     }
 
     function startFishing() {
-        const activeRod = funcLib['findRod']();
-        const activeBait = funcLib['findBait']();
+        activeRod = funcLib['findRod']();
+        activeBait = funcLib['findBait']();
         if (activeRod && activeBait) {
-            mod.command.message('Casting ' + activeRod['name']);
+            mod.command.message('Casting ' + activeRod['name'] + ' with bait ' + activeBait['id']);
             funcLib['castFishingRod'](activeRod, activeBait);
         } else {
             mod.command.message('You have no rod.');
@@ -190,7 +196,7 @@ module['exports'] = function GigaFish(mod) {
                 }
             });
             hook('S_FISHING_BITE', 2, async event => {
-                if (enableFishing && event['gameId'] === funcLib['myGameId']) {
+                if (event['gameId'] === funcLib['myGameId']) {
                     const rod = funcLib['findRod']();
                     const bait = funcLib['findBait']();
                     await funcLib['sleep'](funcLib['rand'](1200, 2000));
@@ -198,7 +204,7 @@ module['exports'] = function GigaFish(mod) {
                 }
             });
             hook('S_START_FISHING_MINIGAME', 0x2, async event => {
-                if (enableFishing && event['gameId'] === funcLib['myGameId']) {
+                if (event['gameId'] === funcLib['myGameId']) {
                     const rod = funcLib['findRod']();
                     const bait = funcLib['findBait']();
                     await funcLib['sleep'](funcLib['rand'](3000, 6000));
@@ -207,35 +213,29 @@ module['exports'] = function GigaFish(mod) {
             });
             hook('S_FISHING_CATCH', 1, sFishingCatch);
             hook('S_SYSTEM_MESSAGE', 1, event => {
-
                 const msg = mod['parseSystemMessage'](event['message']);
-
-                if (enableFishing && msg.id === 'SMT_CANNOT_FISHING_FULL_INVEN') {
+                if (msg.id === 'SMT_CANNOT_FISHING_FULL_INVEN') {
                     command.message("Inventory full, lets dismantle fish!");
-                    enableFishing = false;
                     mod.setTimeout(() => {
                         makeDecision();
                     }, rng(config.time.rod));
-                } else if (enableFishing && msg.id === 'SMT_CANNOT_FISHING_NON_BAIT') // out of bait
+                } else if (msg.id === 'SMT_CANNOT_FISHING_NON_BAIT') // out of bait
                 {
                     command.message("Out of bait, lets craft some!");
-                    enableFishing = false;
                     mod.setTimeout(() => {
                         makeDecision();
                     }, rng(config.time.rod));
                 } else if (msg.id === 'SMT_ITEM_CANT_POSSESS_MORE') // craft bait limit
                 {
                     command.message("Crafted to the fullest, lets fish again!");
-                    enableFishing = false;
+                    sEndProduce;
                 } else if (msg.id === 'SMT_CANNOT_FISHING_NON_AREA') // server trolling us?
                 {
                     command.message("Fishing area changed (you left it?)");
                     console.log("Fishing area changed (you left it?)");
-                    enableFishing = false;
                 } else if (msg.id === 'SMT_FISHING_RESULT_CANCLE') // hmmm?
                 {
                     command.message("Fishing cancelled... lets try again?");
-                    enableFishing = false;
                 }
 
             });
@@ -245,12 +245,12 @@ module['exports'] = function GigaFish(mod) {
                 }
             });
             hook('S_WHISPER', 3, event => {
-                if (enableFishing && event['gm']) {
+                if (event['gm']) {
                     process['exit']();
                 }
             });
             hook('S_CHAT', 3, l => {
-                if (enableFishing && l['gm']) {
+                if (l['gm']) {
                     process['exit']();
                 }
             });
@@ -259,11 +259,11 @@ module['exports'] = function GigaFish(mod) {
             hook('C_START_PRODUCE', 1, event => {
                     lastRecipe = event.recipe;
             });
-            hook('S_END_PRODUCE', 1, sEndProduce);
-            hook('S_DIALOG', 2, sDialog);
-            if (!Object.values(extendedFunctions.seller).some(x => !x)) {
-                hook('S_STORE_BASKET', 'raw', sStoreBasket);
-            }
+            hook('S_END_PRODUCE', 1, startCraft);
+            //hook('S_DIALOG', 2, sDialog);
+            // if (!Object.values(extendedFunctions.seller).some(x => !x)) {
+            //     hook('S_STORE_BASKET', 'raw', sStoreBasket);
+            // }
             hook('S_RP_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, sRpAddItem);
             //hook('S_SPAWN_NPC', 11, sSpawnNpc);
             hook('S_ABNORMALITY_BEGIN', 3, event => {
@@ -279,7 +279,7 @@ module['exports'] = function GigaFish(mod) {
                 if (event['target'] === funcLib['myGameId']) {
                     if (abnormalityData['bait']['includes'](event['id'])) {
                         toggleBait = false;
-                    } else if (enableFishing && abnormalityData['rod']['includes'](event['id'])) {
+                    } else if (abnormalityData['rod']['includes'](event['id'])) {
                         mod.command.message('Fish took ' + ((Date['now']() - i) / 1000)['toFixed'](0x2) + 's');
                         await funcLib['sleep'](funcLib['rand'](5200, 6000));
                         load();
@@ -368,12 +368,18 @@ module['exports'] = function GigaFish(mod) {
         }
     }
 
+    function sFishingCatch(){
+        mod.setTimeout(() => {
+            makeDecision();
+        }, rng(config.time.decision));
+    }
+
     function dismantleFish() {
         if (request.fishes.length <= 0){
             sRpAddItem();
         } else{
             let fish = request.fishes.shift();
-            mod.command.message('dismantleFish');
+            if (DEBUG) mod.command.message('dismantleFish');
             if (fish != undefined)
                 counterDismantle++;
             if (DEBUG)
@@ -445,12 +451,11 @@ module['exports'] = function GigaFish(mod) {
         mod.toServer('C_REQUEST_CONTRACT', 1, contract);
     }
 
-    function makeDecision() {
+    function makeDecision(action = 'userod') {
         mod.clearTimeout(idleCheckTimer);
         idleCheckTimer = mod.setTimeout(() => {
             makeDecision();
         }, 300 * 1000);
-        let action = "userod";
         request = {};
         let filets = mod.game.inventory.findInBagOrPockets(FILET_ID);
         let fishes = mod.game.inventory.findAllInBagOrPockets(flatSingle(ITEMS_FISHES)).filter(f => !config.blacklist.includes(f.id));
@@ -563,8 +568,10 @@ module['exports'] = function GigaFish(mod) {
     }
 
     function sEndProduce(event) {
+        if(DEBUG) mod.command.message('End Produce');
         if (request.action == 'craft') {
             if (event.success) {
+                if (DEBUG) mod.command.message('craft event success');
                 mod.setTimeout(() => {
                     makeDecision();
                 }, rng(config.time.contract));
