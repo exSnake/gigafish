@@ -38,6 +38,7 @@ module['exports'] = function GigaFish(mod) {
     let config = {},
         idleCheckTimer = null,
         request = {};
+    let DEBUG = false;
     let dismantle_contract_type = 90;
     const FILET_ID = 204052;
     const BAITS = {
@@ -79,7 +80,14 @@ module['exports'] = function GigaFish(mod) {
         [206431, 206432, 206433, 206434, 206435, 206454, 206455, 206456], // Tier 10
         // [206500, 206501, 206502, 206503, 206504, 206505, 206506, 206507, 206508, 206509, 206510, 206511, 206512, 206513, 206514], // BAF
     ];
+    //stat
+    let statistic = [],
+        startTime = null,
+        endTime = null,
+        lastLevel = null;
+    //end stat
     const flatSingle = arr => [].concat(...arr);
+
     checkConfig();
 
     const command = mod.command;
@@ -91,14 +99,47 @@ module['exports'] = function GigaFish(mod) {
     let toggleBait = false;
     let i = 0;
     let counterDismantle = 0;
-    mod.command.add('gigafish', (l, m, n) => {
-        if (l === 'start') {
-            enableFishing = true;
-            load();
-        } else {
-            mod.command.message((enableFishing = !enableFishing) ? '<font color="#00FF00">Enabled</font>' : '<font color="#FF0000">Disabled</font>');
+
+    //region Command
+    mod.command.add('gigafish', (key, arg, arg2) => {
+        switch (key) {
+            case 'enable':
+                toggleHooks();
+                mod.command.message((enableFishing = !enableFishing) ? '<font color="#00FF00">Enabled</font>' : '<font color="#FF0000">Disabled</font>');
+                mod.command.message('Manually start fishing now.');
+                break;
+            case 'start':
+                if (enableFishing) {
+                    statistic = [], startTime = null, endTime = null, lastLevel = null;
+                } else {
+                    toggleHooks();
+                }
+                mod.command.message((enableFishing = !enableFishing) ? '<font color="#00FF00">Enabled</font>' : '<font color="#FF0000">Disabled</font>');
+                mod.command.message('Trying to fish.');
+                load();
+                break;
+            case 'stop':case 'disable':
+                if (enableFishing) {
+                    toggleHooks();
+                    mod.command.message('<font color="#FF0000">Disabled</font>');
+                } else {
+                    mod.command.message('Already disabled');
+                }
+                break;
+            case 'debug':
+                DEBUG = !DEBUG;
+                mod.command.message('Debug mode has been ' + (DEBUG ? 'en' : 'dis') + 'abled.');
+                break;
+            case 'dismantle':case 'dismant':
+                request.action = 'dismantle';
+                processDecision();
+                break;
+            default:
+                mod.command.message('Incorrect command, use start/stop/debug');
+                break;
         }
     });
+    //endregion
 
     async function load() {
         if (funcLib['getBaitCount']() > 0) {
@@ -130,129 +171,146 @@ module['exports'] = function GigaFish(mod) {
         }
     }
 
-    hook('S_SYSTEM_MESSAGE', 1, event => {
-
-        const msg = mod['parseSystemMessage'](event['message']);
-
-        if (enableFishing && msg.id === 'SMT_CANNOT_FISHING_FULL_INVEN') {
-            command.message("Inventory full, lets dismantle fish!");
-            enableFishing = false;
-            mod.setTimeout(() => {
-                makeDecision();
-            }, rng(config.time.rod));
-        } else if (enableFishing && msg.id === 'SMT_CANNOT_FISHING_NON_BAIT') // out of bait
-        {
-            command.message("Out of bait, lets craft some!");
-            enableFishing = false;
-            mod.setTimeout(() => {
-                makeDecision();
-            }, rng(config.time.rod));
-        } else if (msg.id === 'SMT_ITEM_CANT_POSSESS_MORE') // craft bait limit
-        {
-            command.message("Crafted to the fullest, lets fish again!");
-            enableFishing = false;
-        } else if (msg.id === 'SMT_CANNOT_FISHING_NON_AREA') // server trolling us?
-        {
-            command.message("Fishing area changed (you left it?)");
-            console.log("Fishing area changed (you left it?)");
-            enableFishing = false;
-        } else if (msg.id === 'SMT_FISHING_RESULT_CANCLE') // hmmm?
-        {
-            command.message("Fishing cancelled... lets try again?");
-            enableFishing = false;
-        }
-
-    });
-    hook('S_ABNORMALITY_BEGIN', 3, event => {
-        if (event['target'] === funcLib['myGameId']) {
-            if (abnormalityData['bait']['includes'](event['id'])) {
-                toggleBait = true;
-            } else if (abnormalityData['rod']['includes'](event['id'])) {
-                i = Date['now']();
-            }
-        }
-    });
-    hook('S_ABNORMALITY_END', 1, async event => {
-        if (event['target'] === funcLib['myGameId']) {
-            if (abnormalityData['bait']['includes'](event['id'])) {
-                toggleBait = false;
-            } else if (enableFishing && abnormalityData['rod']['includes'](event['id'])) {
-                mod.command.message('Fish took ' + ((Date['now']() - i) / 1000)['toFixed'](0x2) + 's');
-                await funcLib['sleep'](funcLib['rand'](5200, 6000));
-                load();
-            }
-        }
-    });
-    hook('S_ITEMLIST', 3, event => {
-        if (event['gameId'] === funcLib['myGameId'] && event['container'] === 0) {
-            const m = event['items']['map'](n => {
-                return {
-                    'id': n['id'],
-                    'dbid': n['dbid'],
-                    'amount': n['amount'],
-                    'slot': n['slot'],
-                    'pocket': event['pocket']
-                };
-            });
-            funcLib['inventory'][event['pocket']] = event['first'] ? m : funcLib['inventory'][event['pocket']]['concat'](m);
-        }
-    });
-    hook('S_FISHING_BITE', 0x2, async event => {
-        if (enableFishing && event['gameId'] === funcLib['myGameId']) {
-            const rod = funcLib['findRod']();
-            const bait = funcLib['findBait']();
-            await funcLib['sleep'](funcLib['rand'](1200, 2000));
-            funcLib['startFishingMinigame'](rod, bait ? bait : { 'id': 0 });
-        }
-    });
-    hook('S_START_FISHING_MINIGAME', 0x2, async event => {
-        if (enableFishing && event['gameId'] === funcLib['myGameId']) {
-            const rod = funcLib['findRod']();
-            const bait = funcLib['findBait']();
-            await funcLib['sleep'](funcLib['rand'](3000, 6000));
-            funcLib['endFishingMinigame'](rod, bait ? bait : { 'id': 0 });
-        }
-    });
-    hook('S_SPAWN_USER', 0xf, event => {
-        if (enableFishing && event['gm']) {
-            process['exit']();
-        }
-    });
-    hook('S_WHISPER', 3, event => {
-        if (enableFishing && event['gm']) {
-            process['exit']();
-        }
-    });
-    hook('S_CHAT', 3, l => {
-        if (enableFishing && l['gm']) {
-            process['exit']();
-        }
-    });
-    hook('S_LOAD_TOPO', 3, () => {
+    function toggleHooks() {
+        enableFishing = !enableFishing;
+        mod.clearAllTimeouts();
         if (enableFishing) {
-            process['exit']();
+            hook('S_ITEMLIST', 3, event => {
+                if (event['gameId'] === funcLib['myGameId'] && event['container'] === 0) {
+                    const m = event['items']['map'](n => {
+                        return {
+                            'id': n['id'],
+                            'dbid': n['dbid'],
+                            'amount': n['amount'],
+                            'slot': n['slot'],
+                            'pocket': event['pocket']
+                        };
+                    });
+                    funcLib['inventory'][event['pocket']] = event['first'] ? m : funcLib['inventory'][event['pocket']]['concat'](m);
+                }
+            });
+            hook('S_FISHING_BITE', 2, async event => {
+                if (enableFishing && event['gameId'] === funcLib['myGameId']) {
+                    const rod = funcLib['findRod']();
+                    const bait = funcLib['findBait']();
+                    await funcLib['sleep'](funcLib['rand'](1200, 2000));
+                    funcLib['startFishingMinigame'](rod, bait ? bait : { 'id': 0 });
+                }
+            });
+            hook('S_START_FISHING_MINIGAME', 0x2, async event => {
+                if (enableFishing && event['gameId'] === funcLib['myGameId']) {
+                    const rod = funcLib['findRod']();
+                    const bait = funcLib['findBait']();
+                    await funcLib['sleep'](funcLib['rand'](3000, 6000));
+                    funcLib['endFishingMinigame'](rod, bait ? bait : { 'id': 0 });
+                }
+            });
+            hook('S_FISHING_CATCH', 1, sFishingCatch);
+            hook('S_SYSTEM_MESSAGE', 1, event => {
+
+                const msg = mod['parseSystemMessage'](event['message']);
+
+                if (enableFishing && msg.id === 'SMT_CANNOT_FISHING_FULL_INVEN') {
+                    command.message("Inventory full, lets dismantle fish!");
+                    enableFishing = false;
+                    mod.setTimeout(() => {
+                        makeDecision();
+                    }, rng(config.time.rod));
+                } else if (enableFishing && msg.id === 'SMT_CANNOT_FISHING_NON_BAIT') // out of bait
+                {
+                    command.message("Out of bait, lets craft some!");
+                    enableFishing = false;
+                    mod.setTimeout(() => {
+                        makeDecision();
+                    }, rng(config.time.rod));
+                } else if (msg.id === 'SMT_ITEM_CANT_POSSESS_MORE') // craft bait limit
+                {
+                    command.message("Crafted to the fullest, lets fish again!");
+                    enableFishing = false;
+                } else if (msg.id === 'SMT_CANNOT_FISHING_NON_AREA') // server trolling us?
+                {
+                    command.message("Fishing area changed (you left it?)");
+                    console.log("Fishing area changed (you left it?)");
+                    enableFishing = false;
+                } else if (msg.id === 'SMT_FISHING_RESULT_CANCLE') // hmmm?
+                {
+                    command.message("Fishing cancelled... lets try again?");
+                    enableFishing = false;
+                }
+
+            });
+            hook('S_SPAWN_USER', 0xf, event => {
+                if (event['gm']) {
+                    process['exit']();
+                }
+            });
+            hook('S_WHISPER', 3, event => {
+                if (enableFishing && event['gm']) {
+                    process['exit']();
+                }
+            });
+            hook('S_CHAT', 3, l => {
+                if (enableFishing && l['gm']) {
+                    process['exit']();
+                }
+            });
+            hook('S_REQUEST_CONTRACT', 1, sRequestContract);
+            hook('S_CANCEL_CONTRACT', 1, sCancelContract);
+            hook('C_START_PRODUCE', 1, event => {
+                    lastRecipe = event.recipe;
+            });
+            hook('S_END_PRODUCE', 1, sEndProduce);
+            hook('S_DIALOG', 2, sDialog);
+            if (!Object.values(extendedFunctions.seller).some(x => !x)) {
+                hook('S_STORE_BASKET', 'raw', sStoreBasket);
+            }
+            hook('S_RP_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, sRpAddItem);
+            //hook('S_SPAWN_NPC', 11, sSpawnNpc);
+            hook('S_ABNORMALITY_BEGIN', 3, event => {
+                if (event['target'] === funcLib['myGameId']) {
+                    if (abnormalityData['bait']['includes'](event['id'])) {
+                        toggleBait = true;
+                    } else if (abnormalityData['rod']['includes'](event['id'])) {
+                        i = Date['now']();
+                    }
+                }
+            });
+            hook('S_ABNORMALITY_END', 1, async event => {
+                if (event['target'] === funcLib['myGameId']) {
+                    if (abnormalityData['bait']['includes'](event['id'])) {
+                        toggleBait = false;
+                    } else if (enableFishing && abnormalityData['rod']['includes'](event['id'])) {
+                        mod.command.message('Fish took ' + ((Date['now']() - i) / 1000)['toFixed'](0x2) + 's');
+                        await funcLib['sleep'](funcLib['rand'](5200, 6000));
+                        load();
+                    }
+                }
+            });
+            hook('S_LOAD_TOPO', 3, () => {
+                if (enableFishing) {
+                    process['exit']();
+                }
+            });
+            hook('S_SPAWN_ME', 3, event => {
+                funcLib['playerPosition'] = { 'loc': event['loc'], 'w': event['w'] };
+            });
+            hook('C_PLAYER_LOCATION', 5, event => {
+                funcLib['playerPosition'] = { 'loc': event['loc'], 'w': event['w'] };
+            });
+            
+        } else {
+            for (var i = 0; i < hooks.length; i++) {
+                mod.unhook(hooks[i]);
+                delete hooks[i];
+            }
         }
-    });
-    hook('S_SPAWN_ME', 3, event => {
-        funcLib['playerPosition'] = { 'loc': event['loc'], 'w': event['w'] };
-    });
-    hook('C_PLAYER_LOCATION', 5, event => {
-        funcLib['playerPosition'] = { 'loc': event['loc'], 'w': event['w'] };
-    });
+    }
+
     hook('S_LOGIN', 0xe, event => {
         funcLib['myGameId'] = event['gameId'];
         funcLib['myName'] = event['name'];
     });
-    hook('S_REQUEST_CONTRACT', 1, sRequestContract);
-    hook('S_CANCEL_CONTRACT', 1, sCancelContract);
-    hook('S_RP_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, sRpAddItem);
-    hook('C_START_PRODUCE', 1, event => {
-        if (enableFishing) {
-            lastRecipe = event.recipe;
-        }
-    });
-    hook('S_END_PRODUCE', 1, sEndProduce);
-
+    
     function sRpAddItem() {
         if (request.action == 'dismantle') {
             if (request.fishes.length > 0) {
@@ -284,7 +342,8 @@ module['exports'] = function GigaFish(mod) {
     }
 
     function sRequestContract(event) {
-        mod.command.message('dismantle sRequestContract a:' + request.action + ' ty:' + event.type + ' id:' + event.id);
+        if (DEBUG)
+            mod.command.message('dismantle sRequestContract a:' + request.action + ' ty:' + event.type + ' id:' + event.id);
         switch (request.action) {
             case "dismantle": {
                 if (event.type == dismantle_contract_type) {
@@ -317,7 +376,8 @@ module['exports'] = function GigaFish(mod) {
             mod.command.message('dismantleFish');
             if (fish != undefined)
                 counterDismantle++;
-            mod.command.message('dismantle dbid:' + fish.dbid + ' c:' + request.contractId + ' itemid' + fish.id);
+            if (DEBUG)
+                mod.command.message('dismantle dbid:' + fish.dbid + ' c:' + request.contractId + ' itemid' + fish.id);
             mod.toServer('C_RQ_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, {
                 counter: counterDismantle,
                 boh: 0,
@@ -379,20 +439,6 @@ module['exports'] = function GigaFish(mod) {
     }
 
     function requestContract(type, obj) {
-/*
-        "senderName": "Andreaus",
-            "recipientName": "",
-            "data": {
-            "type": "Buffer",
-                "data": []
-        },
-        "senderId": "504543895756372270",
-            "recipientId": "0",
-            "type": 90,
-            "id": 8604870,
-            "unk3": 0,
-            "time": 0
-*/
         let contract = {
             type: type
         };
@@ -478,7 +524,8 @@ module['exports'] = function GigaFish(mod) {
 
             }
         }
-        mod.command.message(`Decision ${action}`);
+        if (DEBUG)
+            mod.command.message(`Decision ${action}`);
         request.action = action;
         processDecision();
     }
@@ -498,30 +545,14 @@ module['exports'] = function GigaFish(mod) {
                 break;
             }
             case "userod": {
-                // mod.setTimeout(() => {
-                //     useItem(request.rod);
-                // }, rng(config.time.rod));
                 enableFishing = true;
                 load();
                 break;
             }
             case "aborted": {
-                //toggleHooks();
+                toggleHooks();
                 break;
             }
-            // case "usebait": {
-            //     mod.setTimeout(() => {
-            //         useItem(request.bait);
-            //     }, rng(config.time.bait));
-            //     break;
-            // }
-            
-            // case "usesalad": {
-            //     mod.setTimeout(() => {
-            //         useItem(request.salad);
-            //     }, rng(config.time.bait));
-            //     break;
-            // }
         }
     }
     //endregion
@@ -540,17 +571,6 @@ module['exports'] = function GigaFish(mod) {
             }
         }
     }
-    // function useItem(item) {
-    //     mod.send('C_USE_ITEM', 3, {
-    //         gameId: mod.game.me.gameId,
-    //         id: item.id,
-    //         dbid: item.dbid,
-    //         amount: 1,
-    //         loc: playerLocation.loc,
-    //         w: playerLocation.w,
-    //         unk4: true
-    //     });
-    // }
 };
 
 function c(e) {
