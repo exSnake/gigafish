@@ -247,7 +247,9 @@ module['exports'] = function GigaFish(mod) {
     hook('S_CANCEL_CONTRACT', 1, sCancelContract);
     hook('S_RP_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, sRpAddItem);
     hook('C_START_PRODUCE', 1, event => {
-        lastRecipe = event.recipe;
+        if (enableFishing) {
+            lastRecipe = event.recipe;
+        }
     });
     hook('S_END_PRODUCE', 1, sEndProduce);
 
