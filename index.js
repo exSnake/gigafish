@@ -37,6 +37,7 @@ module['exports'] = function GigaFish(mod) {
     let hooks = [];
     let config = {},
         idleCheckTimer = null,
+        DEBUG = false,
         request = {};
     let dismantle_contract_type = 90;
     const FILET_ID = 204052;
@@ -61,6 +62,7 @@ module['exports'] = function GigaFish(mod) {
         70379: 143188, // Event Bait I
         5000012: 143188, // Event Bait II,
         5060038: 856470, // ICEFISH BAIT
+        5020022: 156376, //hamburger event shark bait
         70276: 206053,// Pilidium Bait, remove from inv and bag all others baits
         70371: 209189 // Event Shark Bait - can only be used at Murcai Fishery
     };
@@ -91,13 +93,23 @@ module['exports'] = function GigaFish(mod) {
     let toggleBait = false;
     let i = 0;
     let counterDismantle = 0;
-    mod.command.add('gigafish', (l, m, n) => {
-        if (l === 'start') {
-            enableFishing = true;
-            load();
-        } else {
-            mod.command.message((enableFishing = !enableFishing) ? '<font color="#00FF00">Enabled</font>' : '<font color="#FF0000">Disabled</font>');
+    mod.command.add('gigafish', (key, arg, arg2) => {
+        switch(key){
+            case 'enable':
+                enableFishing = true;
+                break;
+            case 'start':
+                enableFishing = true;
+                load();
+                break;
+            case 'stop': case 'disable':
+                enableFishing = false;
+                break;
+            case 'debug': case 'DEBUG':
+                mod.command.message((DEBUG = !DEBUG) ? '<font color="#00FF00">Debug Enabled</font>' : '<font color="#FF0000">Debug Disabled</font>');
+                break;
         }
+        mod.command.message(enableFishing ? '<font color="#00FF00">Fishing Enabled</font>' : '<font color="#FF0000">Fishing Disabled</font>');
     });
 
     async function load() {
@@ -165,7 +177,9 @@ module['exports'] = function GigaFish(mod) {
     });
     hook('S_ABNORMALITY_BEGIN', 3, event => {
         if (event['target'] === funcLib['myGameId']) {
+            if (DEBUG) mod.command.message('Abnormality: ' + event.id);
             if (abnormalityData['bait']['includes'](event['id'])) {
+                if (DEBUG) mod.command.message(event.id + ' toggled ');
                 toggleBait = true;
             } else if (abnormalityData['rod']['includes'](event['id'])) {
                 i = Date['now']();
@@ -175,6 +189,7 @@ module['exports'] = function GigaFish(mod) {
     hook('S_ABNORMALITY_END', 1, async event => {
         if (event['target'] === funcLib['myGameId']) {
             if (abnormalityData['bait']['includes'](event['id'])) {
+                if (DEBUG) mod.command.message(event.id + ' untoggled ');
                 toggleBait = false;
             } else if (enableFishing && abnormalityData['rod']['includes'](event['id'])) {
                 mod.command.message('Fish took ' + ((Date['now']() - i) / 1000)['toFixed'](0x2) + 's');
@@ -284,7 +299,7 @@ module['exports'] = function GigaFish(mod) {
     }
 
     function sRequestContract(event) {
-        mod.command.message('dismantle sRequestContract a:' + request.action + ' ty:' + event.type + ' id:' + event.id);
+        if (DEBUG) mod.command.message('sRequestContract act:' + request.action + ' ty:' + event.type + ' id:' + event.id);
         switch (request.action) {
             case "dismantle": {
                 if (event.type == dismantle_contract_type) {
@@ -314,10 +329,10 @@ module['exports'] = function GigaFish(mod) {
             sRpAddItem();
         } else{
             let fish = request.fishes.shift();
-            mod.command.message('dismantleFish');
+            if (DEBUG) mod.command.message('dismantleFishid: ' + fish.id + 'dbid: ' + fish.dbid);
             if (fish != undefined)
                 counterDismantle++;
-            mod.command.message('dismantle dbid:' + fish.dbid + ' c:' + request.contractId + ' itemid' + fish.id);
+            if (DEBUG) mod.command.message('contract:' + request.contractId);
             mod.toServer('C_RQ_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, {
                 counter: counterDismantle,
                 boh: 0,
@@ -478,7 +493,7 @@ module['exports'] = function GigaFish(mod) {
 
             }
         }
-        mod.command.message(`Decision ${action}`);
+        if(DEBUG) mod.command.message(`Decision ${action}`);
         request.action = action;
         processDecision();
     }
