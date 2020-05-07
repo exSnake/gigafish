@@ -38,6 +38,7 @@ module['exports'] = function GigaFish(mod) {
     let config = {},
         idleCheckTimer = null,
         DEBUG = false,
+        lastRecipe = null,
         request = {};
     let dismantle_contract_type = 90;
     const FILET_ID = 204052;
@@ -66,6 +67,9 @@ module['exports'] = function GigaFish(mod) {
         70276: 206053,// Pilidium Bait, remove from inv and bag all others baits
         70371: 209189 // Event Shark Bait - can only be used at Murcai Fishery
     };
+    const RODS = {
+
+    }
     const ITEMS_SALAD = [206020, 206040];
     const ITEMS_FISHES = [
         [206400, 206401], // Tier 0
@@ -80,6 +84,7 @@ module['exports'] = function GigaFish(mod) {
         [206426, 206427, 206428, 206429, 206430, 206452, 206451, 206453], // Tier 9
         [206431, 206432, 206433, 206434, 206435, 206454, 206455, 206456], // Tier 10
         // [206500, 206501, 206502, 206503, 206504, 206505, 206506, 206507, 206508, 206509, 206510, 206511, 206512, 206513, 206514], // BAF
+        [156377] //EVENTs
     ];
     const flatSingle = arr => [].concat(...arr);
     checkConfig();
@@ -113,7 +118,7 @@ module['exports'] = function GigaFish(mod) {
     });
 
     async function load() {
-        if (funcLib['getBaitCount']() > 0) {
+        if (getBaitCount() > 0) {
             if (!toggleBait) {
                 const activeBait = funcLib['findBait']();
                 if (activeBait) {
@@ -127,6 +132,9 @@ module['exports'] = function GigaFish(mod) {
         } else {
             mod.command.message('You have no bait.');
             enableFishing = false;
+            mod.setTimeout(() => {
+                makeDecision();
+            }, rng(config.time.rod));
         }
     }
 
@@ -175,20 +183,10 @@ module['exports'] = function GigaFish(mod) {
         }
 
     });
-    hook('S_ABNORMALITY_BEGIN', 3, event => {
-        if (event['target'] === funcLib['myGameId']) {
-            if (DEBUG) mod.command.message('Abnormality: ' + event.id);
-            if (abnormalityData['bait']['includes'](event['id'])) {
-                if (DEBUG) mod.command.message(event.id + ' toggled ');
-                toggleBait = true;
-            } else if (abnormalityData['rod']['includes'](event['id'])) {
-                i = Date['now']();
-            }
-        }
-    });
+    hook('S_ABNORMALITY_BEGIN', 3, sAbnormalityBegin);
     hook('S_ABNORMALITY_END', 1, async event => {
         if (event['target'] === funcLib['myGameId']) {
-            if (abnormalityData['bait']['includes'](event['id'])) {
+            if (Object.keys(BAITS).includes(event.id.toString())) {
                 if (DEBUG) mod.command.message(event.id + ' untoggled ');
                 toggleBait = false;
             } else if (enableFishing && abnormalityData['rod']['includes'](event['id'])) {
@@ -199,7 +197,7 @@ module['exports'] = function GigaFish(mod) {
         }
     });
     hook('S_ITEMLIST', 3, event => {
-        if (event['gameId'] === funcLib['myGameId'] && event['container'] === 0) {
+        if (mod.game.me.is(event.gameId) && event.container === 0) {
             const m = event['items']['map'](n => {
                 return {
                     'id': n['id'],
@@ -212,7 +210,7 @@ module['exports'] = function GigaFish(mod) {
             funcLib['inventory'][event['pocket']] = event['first'] ? m : funcLib['inventory'][event['pocket']]['concat'](m);
         }
     });
-    hook('S_FISHING_BITE', 0x2, async event => {
+    hook('S_FISHING_BITE', 2, async event => {
         if (enableFishing && event['gameId'] === funcLib['myGameId']) {
             const rod = funcLib['findRod']();
             const bait = funcLib['findBait']();
@@ -278,6 +276,25 @@ module['exports'] = function GigaFish(mod) {
                 mod.setTimeout(() => {
                     commitDecomposition();
                 }, 300);
+            }
+        }
+    }
+
+    function getBaitCount() {
+        let baits = mod.game.inventory.findAllInBagOrPockets(flatSingle(Object.values(BAITS))); //flatSingle make an array from BAITS
+        if(DEBUG)
+            mod.command.message(baits !== undefined ? 'Found ' + baits.length + ' baits in inventory' : 'No Baits found');
+        return baits.length;
+    }
+
+    function sAbnormalityBegin(event){
+        if (mod.game.me.is(event.target)) {
+            if (DEBUG) mod.command.message('Abnormality: ' + event.id);
+            if (Object.keys(BAITS).includes(event.id.toString())) {
+                if (DEBUG) mod.command.message(event.id + ' toggled ');
+                toggleBait = true;
+            } else if (abnormalityData['rod']['includes'](event['id'])) {
+                i = Date['now']();
             }
         }
     }
@@ -541,6 +558,7 @@ module['exports'] = function GigaFish(mod) {
     }
     //endregion
     function startCraft() {
+        if(DEBUG) command.message('Crafting!');
         mod.send('C_START_PRODUCE', 1, {
             recipe: request.recipe
         });

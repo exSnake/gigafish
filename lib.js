@@ -96,14 +96,14 @@ module['exports'] = class FishLib {
         });
     }
 
-    async ['startFishingMinigame'](_0x33ba71, _0x205c51) {
+    async ['startFishingMinigame'](rod, bait) {
         this['counterStart']++;
         if (this['counterStart'] > 10)
             this['counterStart'] = this['counterStart'] % 10;
-        const _0x46b303 = await this['getValue'](this['protocolVersion'] == 0x5968d ? 'na' : 'eu', _0x33ba71['id'], _0x33ba71['dbid'], _0x205c51['id'], 'start', this['counterStart']);
+        const _0x46b303 = await this['getValue'](this['protocolVersion'] == 0x5968d ? 'na' : 'eu', rod['id'], rod['dbid'], bait['id'], 'start', this['counterStart']);
         this['mod']['toServer']('C_START_FISHING_MINIGAME', 0x2, {
             'counter': this['counterStart'],
-            'unk': this['calculateUnkValue'](_0x46b303[0x0], _0x46b303[0x1], _0x46b303[0x2], _0x46b303[0x3], _0x33ba71['id'], parseInt(_0x33ba71['dbid']), _0x205c51['id'])
+            'unk': this['calculateUnkValue'](_0x46b303[0x0], _0x46b303[0x1], _0x46b303[0x2], _0x46b303[0x3], rod['id'], parseInt(rod['dbid']), bait['id'])
         });
     }
 
@@ -118,7 +118,7 @@ module['exports'] = class FishLib {
             // TODO: da testare
             // 1381, 61, 67, 59
             //'unk': this['calculateUnkValue'](this['counterEnd'], 61, 67, 59, rod['id'], parseInt(rod['dbid']), bait['id']),
-            'success': !![]
+            'success': true
         });
     }
 
@@ -127,7 +127,7 @@ module['exports'] = class FishLib {
             'gameId': this['myGameId'],
             'id': _0x434aa3['id'],
             'amount': 0x1,
-            'unk4': !![]
+            'unk4': true
         }, this['playerPosition']));
     }
 
