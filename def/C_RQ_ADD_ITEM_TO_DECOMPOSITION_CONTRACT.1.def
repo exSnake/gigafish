@@ -1,0 +1,7 @@
+# max 20 items at once
+uint32 counter
+uint32 boh
+uint32 contract
+uint64 dbid
+int32 itemid
+uint32 count

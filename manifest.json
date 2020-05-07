@@ -1,10 +1,47 @@
 {
-	"files": {
-		"index.js": "b5909a50b444fd7833736ffb3b180bf7979739cbeac6e8ca6850c220d911c461",
-		"lib.js": "34d5695ca35b15db146751f71d58e2385b999ac79d92dc36e4fea4649c3895e4",
-		"module.json": "9474d27c66f1abd43f0d774f711c646babede87ed4f3665b481942b22d915f94",
-		"data/abnormalities.json": "b0777722f9f7aa91c3dbc81668e41a244c7a7961994427d8db841b571e94ff30",
-		"data/bait.json": "a85e764dc9aa992517c0008c980ee5774e9baebaf6644970e2649b3d6c3b5e1c",
-		"data/rods.json": "f26371820385ca7bdeed49245c6204de63ddb1660470754d8ab9fc2614d971c7"
-	}
+    "files": {
+        "index.js": "4453801f6360c45b77054027687a4577377e2b2b02c86a537594c3f435808967",
+        "module.json": "4711bfedcbd5ec6923c1822b7e30f653ee842bce0b9b2ea8e7333cf8f24e4db8",
+        "node_modules/moment/LICENSE": "8f38f320bbf5eb84c08e08676f7ee1d2204ebe5797f6a090d077329cf212fca3",
+        "node_modules/moment/README.md": "0ea28c66cadbe27b34a8a33629c03e73b07a7874b344842ca5daf850011a4791",
+        "node_modules/moment/moment.js": "abb1e3869d7c4b972c050c0fb07165fb3ab9ca2e2613d4644d92c29e54c24122",
+        "node_modules/moment/package.js": "6334f70497c6d8fd22adb3089eec30bf1e2b3dacf92508df52eaa7a8aee12bba",
+        "node_modules/moment/package.json": "3081147ac38aca42735baede069a3d97cc567e8f0e1f001c35453768897d9207"
+    },
+    "defs": {
+        "C_CANCEL_CONTRACT": 1,
+        "C_CAST_FISHING_ROD": 2,
+        "C_DIALOG": 1,
+        "C_END_FISHING_MINIGAME": [1,2],
+        "C_NPC_CONTACT": 2,
+        "C_PLAYER_LOCATION": 5,
+        "C_REQUEST_CONTRACT": 1,
+        "C_RETURN_TO_LOBBY": 1,
+        "C_RQ_ADD_ITEM_TO_DECOMPOSITION_CONTRACT": 1,
+        "C_RQ_COMMIT_DECOMPOSITION_CONTRACT": 1,
+        "C_START_FISHING_MINIGAME": [1,2],
+        "C_START_PRODUCE": 1,
+        "C_STOP_FISHING": 2,
+        "C_USE_ITEM": 3,
+        "C_USE_PREMIUM_SLOT": 1,
+        "S_ABNORMALITY_BEGIN": [3,4],
+        "S_ABNORMALITY_END": 1,
+        "S_ABNORMALITY_REFRESH": [1,2],
+        "S_CANCEL_CONTRACT": 1,
+        "S_DESPAWN_NPC": 3,
+        "S_DIALOG": 2,
+        "S_END_PRODUCE": 1,
+        "S_EXIT": 3,
+        "S_FISHING_BITE": 1,
+        "S_FISHING_CATCH": 1,
+        "S_LOAD_TOPO": 3,
+        "S_PREMIUM_SLOT_DATALIST": 2,
+        "S_REQUEST_CONTRACT": 1,
+        "S_RP_ADD_ITEM_TO_DECOMPOSITION_CONTRACT": 1,
+        "S_SPAWN_NPC": 11,
+        "S_SPAWN_USER": 15,
+        "S_START_COOLTIME_ITEM": 1,
+        "S_START_FISHING_MINIGAME": 1,
+        "S_SYSTEM_MESSAGE": 1
+    }
 }

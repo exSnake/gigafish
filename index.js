@@ -1,617 +1,1215 @@
-
-
-const d = function () {
-    let e = true;
-    return function (f, g) {
-        const h = e ? function () {
-            if (g) {
-                const j = g['apply'](f, arguments);
-                g = null;
-                return j;
-            }
-        } : function () {
-        };
-        e = false;
-        return h;
-    };
-}();
-(function () {
-    d(this, function () {
-        const e = new RegExp('function *\( *\)');
-        const f = new RegExp('(?:[a-zA-Z_$][0-9a-zA-Z_$]*)', 'i');
-        const g = c('init');
-        if (!e['test'](g + 'chain') || !f['test'](g + 'input')) {
-            g('0');
-        } else {
-            c();
-        }
-    })();
-}());
-const fs = require('fs');
 const path = require('path');
-const abnormalityData = require('./data/abnormalities.json');
+const fs = require('fs');
+const moment = require('moment');
 
-module['exports'] = function GigaFish(mod) {
-
-    mod.game.initialize('inventory');
-    let hooks = [];
-    let config = {},
-        idleCheckTimer = null,
-        DEBUG = false,
-        lastRecipe = null,
-        request = {};
-    let dismantle_contract_type = 90;
-    const FILET_ID = 204052;
-    const BAITS = {
-        70271: 206000, // Bait I 0%
-        70272: 206001, // Bait II 20%
-        70273: 206002, // Bait III 40%
-        70274: 206003, // Bait IV 60%
-        70275: 206004, // Bait V 80%
-        70365: 206905, // Dappled Bait 80% + 5%
-        70364: 206904, // Rainbow Bait 80% + 10%
-        70363: 206903, // Mechanical Worm 80% + 15%
-        70362: 206902, // Enhanced Mechanical Worm 80% + 20%
-        70361: 206901, // Popo Bait 80% + 25%
-        70360: 206900, // Popori Bait 80% + 30%
-        70281: 206005, // Red Angleworm 0%
-        70282: 206006, // Green Angleworm 20%
-        70283: 206007, // Blue Angleworm 40%
-        70284: 206008, // Purple Angleworm 60%
-        70285: 206009, // Golden Angleworm 80%
-        70286: 206828, // Celisium Fragment Bait
-        70379: 143188, // Event Bait I
-        5000012: 143188, // Event Bait II,
-        5060038: 856470, // ICEFISH BAIT
+module.exports = function autoFishing(mod) {
+	const ITEMS_FISHES = [
+		[206400, 206401], // Tier 0
+		[206402, 206403, 206436], // Tier 1
+		[206404, 206405, 206437, 206438], // Tier 2
+		[206406, 206407, 206439, 206440], // Tier 3
+		[206408, 206409, 206410, 206441, 206442], // Tier 4
+		[206411, 206412, 206413, 206443, 206444], // Tier 5
+		[206414, 206415, 206416, 206417, 206445, 206446], // Tier 6
+		[206418, 206419, 206420, 206421, 206447, 206448], // Tier 7
+		[206422, 206423, 206424, 206425, 206449, 206450], // Tier 8
+		[206426, 206427, 206428, 206429, 206430, 206452, 206451, 206453], // Tier 9
+		[206431, 206432, 206433, 206434, 206435, 206454, 206455, 206456], // Tier 10
+		//[206500, 206501, 206502, 206503, 206504, 206505, 206506, 206507, 206508, 206509, 206510, 206511, 206512, 206513, 206514], // BAF
+		[156377] //EVENTs
+	];
+	const ITEMS_RODS = [
+		[...range(206721, 206728)], //Fairywing Rods
+		[...range(206701, 206708)], //Xermetal Rods
+		[...range(206711, 206718)], //Ash Sapling Rods
+		[206700], //Old Rod
+	];
+	const PRICES = [2, 4, 6, 8, 10, 12, 14, 16, 19, 22, 25, 50];
+	const FILET_ID = 204052;
+	const BAITS = {
+		70271: 206000, // Bait I 0%
+		70272: 206001, // Bait II 20%
+		70273: 206002, // Bait III 40%
+		70274: 206003, // Bait IV 60%
+		70275: 206004, // Bait V 80%
+		70365: 206905, // Dappled Bait 80% + 5%
+		70364: 206904, // Rainbow Bait 80% + 10%
+		70363: 206903, // Mechanical Worm 80% + 15%
+		70362: 206902, // Enhanced Mechanical Worm 80% + 20%
+		70361: 206901, // Popo Bait 80% + 25%
+		70360: 206900, // Popori Bait 80% + 30%
+		70281: 206005, // Red Angleworm 0%
+		70282: 206006, // Green Angleworm 20%
+		70283: 206007, // Blue Angleworm 40%
+		70284: 206008, // Purple Angleworm 60%
+		70285: 206009, // Golden Angleworm 80%
+		70286: 206828, // Celisium Fragment Bait
+		70379: 143188, // Event Bait I
+		5000012: 143188, // Event Bait II,
+		5060038: 856470, // ICEFISH BAIT
         5020022: 156376, //hamburger event shark bait
-        70276: 206053,// Pilidium Bait, remove from inv and bag all others baits
-        70371: 209189 // Event Shark Bait - can only be used at Murcai Fishery
-    };
-    const RODS = {
+		70276: 206053,// Pilidium Bait, remove from inv and bag all others baits
+		70371 : 209189 // Event Shark Bait - can only be used at Murcai Fishery
+	};
+	const ITEMS_BANKER = [60264, 160326, 170003, 210111, 216754];
+	const ITEMS_SELLER = [160324, 170004, 210109, 60262, 60263, 160325, 170006, 210110];
+	const TEMPLATE_SELLER = [9903, 9906, 1960, 1961];
+	const TEMPLATE_BANKER = 1962;
+	const ITEMS_SALAD = [206020, 206040];
+	const flatSingle = arr => [].concat(...arr);
+	let enabled = false,
+		playerLocation = {},
+		request = {},
+		npcList = {},
+		pcbangBanker = null,
+		scrollsInCooldown = false,
+		endSellingTimer = null,
+		lastRecipe = null,
+		sellItemsCount = 0,
+		unkStartCounter = 0,
+		unkEndCounter = 0,
+		unkCastCounter = 0,
+		counterDismantle = 0,
+		idleCheckTimer = null,
+		activeRod = null,
+		activeBait = null;
+	let DEBUG = false;
+	let hooks = [];
+	const funcLib = new (require('./lib.js'))(mod, mod['dispatch']['protocolVersion'], mod['dispatch']['cli']);
+	let extendedFunctions = {
+		'banker': {
+			'C_PUT_WARE_ITEM': false,
+		},
+		'seller': {
+			'C_STORE_SELL_ADD_BASKET': false,
+			'S_STORE_BASKET': false,
+			'C_STORE_COMMIT': false,
+		}
+	};
+	let dismantle_contract_type = (mod.majorPatchVersion >= 85 ? 90 : 89);
+	let statistic = [],
+		startTime = null,
+		endTime = null,
+		lastLevel = null;
 
-    }
-    const ITEMS_SALAD = [206020, 206040];
-    const ITEMS_FISHES = [
-        [206400, 206401], // Tier 0
-        [206402, 206403, 206436], // Tier 1
-        [206404, 206405, 206437, 206438], // Tier 2
-        [206406, 206407, 206439, 206440], // Tier 3
-        [206408, 206409, 206410, 206441, 206442], // Tier 4
-        [206411, 206412, 206413, 206443, 206444], // Tier 5
-        [206414, 206415, 206416, 206417, 206445, 206446], // Tier 6
-        [206418, 206419, 206420, 206421, 206447, 206448], // Tier 7
-        [206422, 206423, 206424, 206425, 206449, 206450], // Tier 8
-        [206426, 206427, 206428, 206429, 206430, 206452, 206451, 206453], // Tier 9
-        [206431, 206432, 206433, 206434, 206435, 206454, 206455, 206456], // Tier 10
-        // [206500, 206501, 206502, 206503, 206504, 206505, 206506, 206507, 206508, 206509, 206510, 206511, 206512, 206513, 206514], // BAF
-        [156377] //EVENTs
-    ];
-    const flatSingle = arr => [].concat(...arr);
-    checkConfig();
+	let config, settingsPath;
+	if (mod.proxyAuthor !== 'caali' || !global.TeraProxy)
+		mod.warn('You are trying to use auto-fishing on an unsupported version of tera-proxy.');
 
-    const command = mod.command;
-    if (!mod.command && mod.require) {
-        mod.command = mod.require.command;
-    }
-    const funcLib = new (require('./lib.js'))(mod, mod['dispatch']['protocolVersion'], mod['dispatch']['cli']);
-    let enableFishing = false;
-    let toggleBait = false;
-    let i = 0;
-    let counterDismantle = 0;
-    mod.command.add('gigafish', (key, arg, arg2) => {
-        switch(key){
-            case 'enable':
-                enableFishing = true;
-                break;
-            case 'start':
-                enableFishing = true;
-                load();
-                break;
-            case 'stop': case 'disable':
-                enableFishing = false;
-                break;
-            case 'debug': case 'DEBUG':
-                mod.command.message((DEBUG = !DEBUG) ? '<font color="#00FF00">Debug Enabled</font>' : '<font color="#FF0000">Debug Disabled</font>');
-                break;
-        }
-        mod.command.message(enableFishing ? '<font color="#00FF00">Fishing Enabled</font>' : '<font color="#FF0000">Fishing Disabled</font>');
-    });
+	mod.game.initialize(['inventory']);
+	mod.game.on('enter_game', () => {
+		try {
+			//settingsPath = `./${mod.game.me.name}-${mod.game.serverId}.json`;
+			settingsPath = `./config.json`;
+			getConfigData(settingsPath);
+			for (var type in extendedFunctions) {
+				for (var opcode in extendedFunctions[type]) {
+					var test = mod.dispatch.protocolMap.name.get(opcode);
+					if (test !== undefined && test != null) extendedFunctions[type][opcode] = true;
+				}
+			}
+			if (config.filetmode == 'bank' && Object.values(extendedFunctions.banker).some(x => !x)) {
+				config.filetmode = false;
+				mod.command.message('C_PUT_WARE_ITEM not mapped, banker functions will be disabled!');
+			}
+			if (config.filetmode == 'sellscroll' && Object.values(extendedFunctions.seller).some(x => !x)) {
+				config.filetmode = false;
+				mod.command.message('C_STORE_SELL_ADD_BASKET|S_STORE_BASKET|C_STORE_COMMIT not mapped, seller functions will be disabled!');
+			}
+		} catch (e) {
+			console.log(e);
+		}
+	});
 
-    async function load() {
-        if (getBaitCount() > 0) {
-            if (!toggleBait) {
-                const activeBait = funcLib['findBait']();
-                if (activeBait) {
-                    funcLib['activateBait'](activeBait);
-                    do {
-                        await funcLib['sleep'](funcLib['rand'](500, 1000));
-                    } while (!toggleBait);
-                }
-            }
-            startFishing();
-        } else {
-            mod.command.message('You have no bait.');
-            enableFishing = false;
-            mod.setTimeout(() => {
-                makeDecision();
-            }, rng(config.time.rod));
-        }
-    }
+	function hook(...args) {
+		hooks.push(mod.hook(...args));
+	}
 
-    function startFishing() {
-        const activeRod = funcLib['findRod']();
-        const activeBait = funcLib['findBait']();
-        if (activeRod && activeBait) {
-            mod.command.message('Casting ' + activeRod['name']);
-            funcLib['castFishingRod'](activeRod, activeBait);
-        } else {
-            mod.command.message('You have no rod.');
-            enableFishing = false;
-        }
-    }
+	function toggleHooks() {
+		enabled = !enabled;
+		mod.clearAllTimeouts();
+		if (enabled) {
+			mod.command.message('Auto fishing activated. Manually start fishing now.');
+			if(mod.majorPatchVersion >= 88){
+				mod.command.message('Idk if current solution is safe.');
+			}
+		} else {
+			mod.command.message('Auto fishing deactivated.');
+		}
+		if (enabled) {
+			hook('S_FISHING_BITE', 1, sFishingBite);
+			hook('S_START_FISHING_MINIGAME', 1, sStartFishingMinigame);
+			hook('S_FISHING_CATCH', 1, sFishingCatch);
+			hook('S_SYSTEM_MESSAGE', 1, sSystemMessage);
+			hook('S_REQUEST_CONTRACT', 1, sRequestContract);
+			hook('S_CANCEL_CONTRACT', 1, sCancelContract);
+			hook('S_END_PRODUCE', 1, sEndProduce);
+			hook('S_DIALOG', 2, sDialog);
+			if (!Object.values(extendedFunctions.seller).some(x => !x)) {
+				hook('S_STORE_BASKET', 'raw', sStoreBasket);
+			}
+			hook('S_RP_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, sRpAddItem);
+			hook('S_SPAWN_NPC', 11, sSpawnNpc);
+			hook('S_ABNORMALITY_BEGIN', mod.majorPatchVersion >= 86?4:3, sAbnBegin);
+			// if(mod.majorPatchVersion >= 88){
+			// 	hook('C_CAST_FISHING_ROD', 2, cCastFishingRod);
+			// 	hook('C_STOP_FISHING', 2, cStopFishing);
+			// }
+		} else {
+			for (var i = 0; i < hooks.length; i++) {
+				mod.unhook(hooks[i]);
+				delete hooks[i];
+			}
+		}
+	}
 
-    hook('S_SYSTEM_MESSAGE', 1, event => {
+	this.destructor = () => {
+		mod.clearAllTimeouts();
+	};
 
-        const msg = mod['parseSystemMessage'](event['message']);
+	//region Hooks
 
-        if (enableFishing && msg.id === 'SMT_CANNOT_FISHING_FULL_INVEN') {
-            command.message("Inventory full, lets dismantle fish!");
-            enableFishing = false;
-            mod.setTimeout(() => {
-                makeDecision();
-            }, rng(config.time.rod));
-        } else if (enableFishing && msg.id === 'SMT_CANNOT_FISHING_NON_BAIT') // out of bait
-        {
-            command.message("Out of bait, lets craft some!");
-            enableFishing = false;
-            mod.setTimeout(() => {
-                makeDecision();
-            }, rng(config.time.rod));
-        } else if (msg.id === 'SMT_ITEM_CANT_POSSESS_MORE') // craft bait limit
-        {
-            command.message("Crafted to the fullest, lets fish again!");
-            enableFishing = false;
-        } else if (msg.id === 'SMT_CANNOT_FISHING_NON_AREA') // server trolling us?
-        {
-            command.message("Fishing area changed (you left it?)");
-            console.log("Fishing area changed (you left it?)");
-            enableFishing = false;
-        } else if (msg.id === 'SMT_FISHING_RESULT_CANCLE') // hmmm?
-        {
-            command.message("Fishing cancelled... lets try again?");
-            enableFishing = false;
-        }
+	async function cCastFishingRod(){
+		unkCastCounter = unkCastCounter++ > 10 ? 0 : unkCastCounter++;
+		const phpGet = await funcLib['getValue']('eu', activeRod.id, activeRod.dbid, activeBait.id, 'cast', unkCastCounter);
+		mod.toServer('C_CAST_FISHING_ROD', 2, {
+			'counter': unkCastCounter,
+			'unk1': funcLib['calculateUnkValue'](phpGet[0], phpGet[1], phpGet[2], phpGet[3], activeRod.id, parseInt(activeRod.dbid), activeBait.id),
+			'unk2': 0x100182bc,
+			'rodId': activeRod.id,
+			'dbid': activeRod.dbid,
+			'power': 3
+		});
+	}
+	function cStopFishing(event){
+		event.counter=1;
+		event.unk=1;
+		return true;
+	}
 
-    });
-    hook('S_ABNORMALITY_BEGIN', 3, sAbnormalityBegin);
-    hook('S_ABNORMALITY_END', 1, async event => {
-        if (event['target'] === funcLib['myGameId']) {
-            if (Object.keys(BAITS).includes(event.id.toString())) {
-                if (DEBUG) mod.command.message(event.id + ' untoggled ');
-                toggleBait = false;
-            } else if (enableFishing && abnormalityData['rod']['includes'](event['id'])) {
-                mod.command.message('Fish took ' + ((Date['now']() - i) / 1000)['toFixed'](0x2) + 's');
-                await funcLib['sleep'](funcLib['rand'](5200, 6000));
-                load();
-            }
-        }
-    });
-    hook('S_ITEMLIST', 3, event => {
-        if (mod.game.me.is(event.gameId) && event.container === 0) {
-            const m = event['items']['map'](n => {
-                return {
-                    'id': n['id'],
-                    'dbid': n['dbid'],
-                    'amount': n['amount'],
-                    'slot': n['slot'],
-                    'pocket': event['pocket']
-                };
-            });
-            funcLib['inventory'][event['pocket']] = event['first'] ? m : funcLib['inventory'][event['pocket']]['concat'](m);
-        }
-    });
-    hook('S_FISHING_BITE', 2, async event => {
-        if (enableFishing && event['gameId'] === funcLib['myGameId']) {
-            const rod = funcLib['findRod']();
-            const bait = funcLib['findBait']();
-            await funcLib['sleep'](funcLib['rand'](1200, 2000));
-            funcLib['startFishingMinigame'](rod, bait ? bait : { 'id': 0 });
-        }
-    });
-    hook('S_START_FISHING_MINIGAME', 0x2, async event => {
-        if (enableFishing && event['gameId'] === funcLib['myGameId']) {
-            const rod = funcLib['findRod']();
-            const bait = funcLib['findBait']();
-            await funcLib['sleep'](funcLib['rand'](3000, 6000));
-            funcLib['endFishingMinigame'](rod, bait ? bait : { 'id': 0 });
-        }
-    });
-    hook('S_SPAWN_USER', 0xf, event => {
-        if (enableFishing && event['gm']) {
-            process['exit']();
-        }
-    });
-    hook('S_WHISPER', 3, event => {
-        if (enableFishing && event['gm']) {
-            process['exit']();
-        }
-    });
-    hook('S_CHAT', 3, l => {
-        if (enableFishing && l['gm']) {
-            process['exit']();
-        }
-    });
-    hook('S_LOAD_TOPO', 3, () => {
-        if (enableFishing) {
-            process['exit']();
-        }
-    });
-    hook('S_SPAWN_ME', 3, event => {
-        funcLib['playerPosition'] = { 'loc': event['loc'], 'w': event['w'] };
-    });
-    hook('C_PLAYER_LOCATION', 5, event => {
-        funcLib['playerPosition'] = { 'loc': event['loc'], 'w': event['w'] };
-    });
-    hook('S_LOGIN', 0xe, event => {
-        funcLib['myGameId'] = event['gameId'];
-        funcLib['myName'] = event['name'];
-    });
-    hook('S_REQUEST_CONTRACT', 1, sRequestContract);
-    hook('S_CANCEL_CONTRACT', 1, sCancelContract);
-    hook('S_RP_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, sRpAddItem);
-    hook('C_START_PRODUCE', 1, event => {
-        if (enableFishing) {
-            lastRecipe = event.recipe;
-        }
-    });
-    hook('S_END_PRODUCE', 1, sEndProduce);
+	function sAbnBegin(event) {
+		if (mod.game.me.is(event.target)) {
+			switch (request.action) {
+				case 'usesalad': {
+					if (event.id == 70261)
+						mod.setTimeout(() => {
+							makeDecision();
+						}, config.time.bait);
+					break;
+				}
+				case 'usebait': {
+					if (Object.keys(BAITS).includes(event.id.toString()))
+						mod.setTimeout(() => {
+							makeDecision();
+						}, config.time.bait);
+					break;
+				}
+			}
+		}
+	}
 
-    function sRpAddItem() {
-        if (request.action == 'dismantle') {
-            if (request.fishes.length > 0) {
-                mod.setTimeout(() => {
-                    dismantleFish();
-                }, rng(config.time.dismantle));
-            } else {
-                mod.setTimeout(() => {
-                    commitDecomposition();
-                }, 300);
-            }
-        }
-    }
+	function sSpawnNpc(event) {
+		switch (request.action) {
+			case "bank": {
+				if (event.relation == 12 && event.templateId == TEMPLATE_BANKER && mod.game.me.is(event.owner)) {
+					request.banker = event;
+					mod.setTimeout(() => {
+						contactToNpc(request.banker.gameId);
+					}, rng(3000, 5000));
+				}
+				break;
+			}
+			case "sellscroll": {
+				if (event.relation == 12 && TEMPLATE_SELLER.includes(event.templateId) && mod.game.me.is(event.owner)) {
+					request.seller = event;
+					mod.setTimeout(() => {
+						contactToNpc(request.seller.gameId);
+					}, rng(3000, 5000));
+				}
+				break;
+			}
+		}
+	}
 
-    function getBaitCount() {
-        let baits = mod.game.inventory.findAllInBagOrPockets(flatSingle(Object.values(BAITS))); //flatSingle make an array from BAITS
-        if(DEBUG)
-            mod.command.message(baits !== undefined ? 'Found ' + baits.length + ' baits in inventory' : 'No Baits found');
-        return baits.length;
-    }
+	function sRpAddItem() {
+		if (request.action == 'dismantle') {
+			if (request.fishes.length > 0) {
+				mod.setTimeout(() => {
+					dismantleFish();
+				}, rng(config.time.dismantle));
+			} else {
+				mod.setTimeout(() => {
+					commitDecomposition();
+				}, 300);
+			}
+		}
+	}
 
-    function sAbnormalityBegin(event){
-        if (mod.game.me.is(event.target)) {
-            if (DEBUG) mod.command.message('Abnormality: ' + event.id);
-            if (Object.keys(BAITS).includes(event.id.toString())) {
-                if (DEBUG) mod.command.message(event.id + ' toggled ');
-                toggleBait = true;
-            } else if (abnormalityData['rod']['includes'](event['id'])) {
-                i = Date['now']();
-            }
-        }
-    }
+	async function sFishingBite(event) {
+		if (mod.game.me.is(event.gameId)) {
+			activeBait = activeBait ? activeBait : { 'id' : 0 };
+			unkStartCounter = unkStartCounter++ > 10 ? 0 : unkStartCounter++;
+			const phpGet = await funcLib['getValue']('eu', activeRod.id, activeRod.dbid, activeBait.id, 'start', unkStartCounter);
+			mod.setTimeout(() => {
+				mod.toServer('C_START_FISHING_MINIGAME', 2, {
+					'counter': unkStartCounter,
+					'unk': funcLib['calculateUnkValue'](phpGet[0], phpGet[1], phpGet[2], phpGet[3], activeRod.id, parseInt(activeRod.dbid), activeBait.id)
+				});
+			}, rng(config.time.stMinigame));
+		}
+	}
 
-    function commitDecomposition() {
-        mod.send('C_RQ_COMMIT_DECOMPOSITION_CONTRACT', 1, {
-            contract: request.contractId
-        });
-        mod.setTimeout(() => { //reduce opcodes
-            cancelContract(dismantle_contract_type, request.contractId);
-        }, 10000);
-    }
+	async function sStartFishingMinigame(event) {
+		if (mod.game.me.is(event.gameId)) {
+			lastLevel = event.level;
+			activeBait = activeBait ? activeBait : { 'id': 0 };
+			unkEndCounter = unkEndCounter++ > 10 ? 0 : unkEndCounter++;
+			const phpGet = await funcLib['getValue']('eu', activeRod.id, activeRod.dbid, activeBait.id, 'end', unkEndCounter);
+			if (config.skipbaf && (event.level == 11 || (abnormalityDuration(70261) > 0 && event.level == 7))) {
+				mod.setTimeout(() => {
+					mod.toServer('C_END_FISHING_MINIGAME', 2, {
+						'counter': unkEndCounter,
+						'unk': funcLib['calculateUnkValue'](phpGet[0], phpGet[1], phpGet[2], phpGet[3], activeRod.id, parseInt(activeRod.dbid), activeBait.id),
+						'success': false
+					});
+					mod.setTimeout(() => {
+						makeDecision();
+					}, rng(config.time.rod));
+				}, rng(8000, 10000));
+			} else {
+				mod.setTimeout(() => {
+					mod.toServer('C_END_FISHING_MINIGAME', 2, {
+						'counter': unkEndCounter,
+						'unk': funcLib['calculateUnkValue'](phpGet[0], phpGet[1], phpGet[2], phpGet[3], activeRod.id, parseInt(activeRod.dbid), activeBait.id),
+						'success': true
+					});
+				}, rng(config.time.minigame));
+			}
+		}
+	}
 
-    function cancelContract(type, id) {
-        mod.send('C_CANCEL_CONTRACT', 1, {
-            type: type,
-            id: id
-        });
-    }
+	function sFishingCatch(event) {
+		if (mod.game.me.is(event.gameId)) {
+			endTime = moment();
+			if (startTime != null && lastLevel != null)
+				statistic.push({
+					level: lastLevel,
+					time: endTime.diff(startTime)
+				});
+			startTime = moment();
+			mod.setTimeout(() => {
+				makeDecision();
+			}, rng(config.time.decision));
+		}
+	}
 
-    function sRequestContract(event) {
-        if (DEBUG) mod.command.message('sRequestContract act:' + request.action + ' ty:' + event.type + ' id:' + event.id);
-        switch (request.action) {
-            case "dismantle": {
-                if (event.type == dismantle_contract_type) {
-                    request.contractId = event.id;
-                    dismantleFish();
-                }
-                break;
-            }
-        }
-    }
+	function sSystemMessage(event) {
+		let message = mod.parseSystemMessage(event.message);
+		if (message.id == 'SMT_CANNOT_FISHING_NON_AREA') {
+			mod.setTimeout(() => {
+				makeDecision();
+			}, rng(config.time.rod));
+		}
+	}
 
-    function sCancelContract(event) {
-        switch (request.action) {
-            case "dismantle": {
-                if (event.type == dismantle_contract_type && request.contractId == event.id) {
-                    mod.setTimeout(() => {
-                        makeDecision();
-                    }, rng(config.time.contract));
-                }
-                break;
-            }
-        }
-    }
+	function sRequestContract(event) {
+		switch (request.action) {
+			case "sellscroll":
+			case "selltonpc": {
+				if (event.type == 9) {
+					request.seller.contractId = event.id;
+					if (request.fishes.length === 0) {
+						mod.clearTimeout(endSellingTimer);
+						endSellingTimer = mod.setTimeout(() => {
+							cancelContract(9, request.seller.contractId);
+						}, 5000);
+					} else {
+						mod.setTimeout(() => {
+							sellFish();
+						}, rng(config.time.sell));
+					}
+				}
+				break;
+			}
+			case "bank": {
+				if (event.type == 26) {
+					request.banker.contractId = event.id;
+					bankFillets();
+				}
+			}
+			case "dismantle": {
+				if (event.type == dismantle_contract_type) {
+					request.contractId = event.id;
+					dismantleFish();
+				}
+				break;
+			}
+		}
+	}
 
-    function dismantleFish() {
-        if (request.fishes.length <= 0){
-            sRpAddItem();
-        } else{
-            let fish = request.fishes.shift();
-            if (DEBUG) mod.command.message('dismantleFishid: ' + fish.id + 'dbid: ' + fish.dbid);
-            if (fish != undefined)
-                counterDismantle++;
-            if (DEBUG) mod.command.message('contract:' + request.contractId);
-            mod.toServer('C_RQ_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, {
-                counter: counterDismantle,
-                boh: 0,
-                contract: request.contractId,
-                dbid: fish.dbid,
-                itemid: fish.id,
-                count: 1
-            });
-        }   
-    }
+	function sCancelContract(event) {
+		switch (request.action) {
+			case "sellscroll":
+			case "selltonpc": {
+				if (event.type == 9 && request.seller.contractId == event.id)
+					mod.setTimeout(() => {
+						makeDecision();
+					}, rng(config.time.contract));
+				break;
+			}
+			case "bank": {
+				if (event.type == 26 && request.banker.contractId == event.id) {
+					mod.setTimeout(() => {
+						makeDecision();
+					}, rng(config.time.contract));
+				}
+			}
+			case "dismantle": {
+				if (event.type == dismantle_contract_type && request.contractId == event.id) {
+					mod.setTimeout(() => {
+						makeDecision();
+					}, rng(config.time.contract));
+				}
+				break;
+			}
+		}
+	}
 
-    function hook(...args) {
-        hooks.push(mod['hook'](...args));
-    }
+	function sEndProduce(event) {
+		if (request.action == 'craft') {
+			if (event.success) {
+				mod.setTimeout(() => {
+					makeDecision();
+				}, rng(config.time.contract));
+			}
+		}
+	}
 
-    function checkConfig() {
-        config.filetmode = true;
-        config.autosalad = false;
-        config.time = {};
-        config.time.minigame = {};
-        config.time.minigame.min = 4000;
-        config.time.minigame.max = 5000;
-        config.time.stMinigame = {};
-        config.time.stMinigame.min = 2000;
-        config.time.stMinigame.max = 4000;
-        config.time.rod = {};
-        config.time.rod.min = 4500;
-        config.time.rod.max = 5500;
-        config.time.bait = {};
-        config.time.bait.min = 250;
-        config.time.bait.max = 750;
-        config.time.sell = {};
-        config.time.sell.min = 150;
-        config.time.sell.max = 300;
-        config.time.contract = {};
-        config.time.contract.min = 500;
-        config.time.contract.max = 1000;
-        config.time.dialog = {};
-        config.time.dialog.min = 1500;
-        config.time.dialog.max = 3000;
-        config.time.dismantle = {};
-        config.time.dismantle.min = 400;
-        config.time.dismantle.max = 600;
-        config.time.decision = {};
-        config.time.decision.min = 500;
-        config.time.decision.max = 700;
-        config.bankAmount = 8000;
-        config.contdist = 6;
-        config.recipe = 204100;
-        config.blacklist = [];
-        config.gmmode = 'stop';
-    }
+	function sDialog(event) {
+		switch (request.action) {
+			case "bank": {
+				if (event.gameId == request.banker.gameId) {
+					request.banker.dialogId = event.id;
+					mod.setTimeout(() => {
+						mod.send('C_DIALOG', 1, {
+							id: request.banker.dialogId,
+							index: 1,
+							questReward: -1,
+							unk: -1
+						});
+					}, rng(config.time.dialog));
+				}
+				break;
+			}
+			case "sellscroll":
+			case "selltonpc": {
+				if (event.gameId == request.seller.gameId) {
+					request.seller.dialogId = event.id;
+					mod.setTimeout(() => {
+						mod.send('C_DIALOG', 1, {
+							id: request.seller.dialogId,
+							index: 1,
+							questReward: -1,
+							unk: -1
+						});
+					}, rng(config.time.dialog));
+				}
+				break;
+			}
+		}
+	}
 
-    function rng(f, s) {
-        if (s !== undefined)
-            return f + Math.floor(Math.random() * (s - f + 1));
-        else
-            return f.min + Math.floor(Math.random() * (f.max - f.min + 1));
-    }
+	function sStoreBasket() {
+		switch (request.action) {
+			case "sellscroll":
+			case "selltonpc": {
+				if (request.fishes.length > 0 && sellItemsCount < 7) {
+					sellItemsCount++;
+					mod.setTimeout(() => {
+						sellFish();
+					}, rng(config.time.sell));
+					if (request.fishes.length < 8) {
+						mod.clearTimeout(endSellingTimer);
+						endSellingTimer = mod.setTimeout(() => {
+							cancelContract(9, request.seller.contractId);
+						}, 10000);
+					}
+				} else {
+					mod.setTimeout(() => {
+						if (sellItemsCount > 0)
+							sellFishes();
+						else {
+							mod.clearTimeout(endSellingTimer);
+							endSellingTimer = mod.setTimeout(() => {
+								cancelContract(9, request.seller.contractId);
+							}, 1000);
+						}
+					}, 300);
+				}
+				break;
+			}
+		}
+	}
+	//endregion
 
-    function requestContract(type, obj) {
-/*
-        "senderName": "Andreaus",
-            "recipientName": "",
-            "data": {
-            "type": "Buffer",
-                "data": []
-        },
-        "senderId": "504543895756372270",
-            "recipientId": "0",
-            "type": 90,
-            "id": 8604870,
-            "unk3": 0,
-            "time": 0
-*/
-        let contract = {
-            type: type
-        };
-        mod.toServer('C_REQUEST_CONTRACT', 1, contract);
-    }
+	//region Permanent hooks
+	mod.hook('C_START_PRODUCE', 1, event => {
+		lastRecipe = event.recipe;
+	});
+	mod.hook('S_SPAWN_NPC', 11, event => {
+		if (TEMPLATE_SELLER.includes(event.templateId) ||
+			TEMPLATE_BANKER == event.templateId && event.owner === 0n ||
+			mod.game.me.is(event.owner)) {
+			npcList[event.gameId] = event;
+		}
+	});
+	mod.hook('S_DESPAWN_NPC', 3, event => {
+		delete npcList[event.gameId];
+	});
+	mod.hook('S_SPAWN_USER', 15, event => {
+		if (event.gm && enabled)
+			switch (config.gmmode) {
+				case 'exit': {
+					console.log(`auto-fishing(${mod.game.me.name})|ERROR: GM is near you, exit game xD`);
+					toggleHooks();
+					mod.toClient('S_EXIT', 3, {
+						category: 0,
+						code: 0
+					});
+					break;
+				}
+				case 'lobby': {
+					console.log(`auto-fishing(${mod.game.me.name})|ERROR: GM is near you, return to lobby`);
+					toggleHooks();
+					mod.toServer('C_RETURN_TO_LOBBY', 1, {});
+					break;
+				}
+				case 'stop': {
+					mod.command.message(`ERROR: GM is near you, fishing stoped`);
+					console.log(`auto-fishing(${mod.game.me.name})|ERROR: GM is near you, fishing stoped`);
+					toggleHooks();
+					break
+				}
+				default: {
+					mod.command.message(`Warning: GM is near you.`);
+					console.log(`auto-fishing(${mod.game.me.name})|Warning: GM is near you.`);
+					break
+				}
+			}
+	});
+	mod.hook('S_PREMIUM_SLOT_DATALIST', 2, event => {
+		for (let set of event.sets) {
+			for (let inven of set.inventory) {
+				if (ITEMS_BANKER.includes(inven.item)) {
+					pcbangBanker = {
+						set: set.id,
+						slot: inven.slot,
+						type: inven.type,
+						id: inven.id
+					};
+				}
+			}
+		}
+	});
+	mod.hook('S_START_COOLTIME_ITEM', 1, event => {
+		if ((ITEMS_BANKER.includes(event.item) || ITEMS_SELLER.includes(event.item)) && event.cooldown > 0 && !scrollsInCooldown) {
+			scrollsInCooldown = true;
+			setTimeout(() => {
+				scrollsInCooldown = false;
+			}, event.cooldown * 1000);
+		}
+	});
+	mod.hook('C_PLAYER_LOCATION', 5, event => {
+		playerLocation = event;
+	});
+	mod.hook('S_LOAD_TOPO', 3, event => {
+		playerLocation.loc = event.loc;
+		playerLocation.w = 0;
+		if (enabled)
+			mod.clearAllTimeouts();
+	});
+	mod.hook('C_RETURN_TO_LOBBY', 1, event => {
+		if (enabled)
+			mod.clearAllTimeouts();
+	});
+	mod.hook('S_EXIT', 3, event => {
+		if (enabled)
+			mod.clearAllTimeouts();
+	});
+	//endregion
 
-    function makeDecision() {
-        mod.clearTimeout(idleCheckTimer);
-        idleCheckTimer = mod.setTimeout(() => {
-            makeDecision();
-        }, 300 * 1000);
-        let action = "userod";
-        request = {};
-        let filets = mod.game.inventory.findInBagOrPockets(FILET_ID);
-        let fishes = mod.game.inventory.findAllInBagOrPockets(flatSingle(ITEMS_FISHES)).filter(f => !config.blacklist.includes(f.id));
-        let bait_solia = mod.game.inventory.findInBagOrPockets(Object.values(BAITS));
-        let salad = mod.game.inventory.findInBagOrPockets(ITEMS_SALAD);
-        // if (config.autosalad) {
-        //     if (abnormalityDuration(70261) <= 0 && salad !== undefined)
-        //         action = "usesalad";
-        // }
-        if (bait_solia === undefined) {
-            if (filets === undefined || filets.amount < 60) {
-                action = "dismantle";
-            } else {
-                action = "craft";
-            }
-        } 
-        // else {
-        //     if (Object.keys(BAITS).every((el) => {
-        //         return abnormalityDuration(Number(el)) <= 0;
-        //     }))
-        //         action = "usebait";
-        // }
-        if (mod.game.inventory.bag.size - mod.game.inventory.bagItems.length <= 3) {
-            if (filets === undefined || filets.amount < 60)
-                action = "dismantle";
-            else
-                action = "fullinven";
-        }
-        switch (action) {
-            case "fullinven": {
-                action = config.filetmode;
-                switch (config.filetmode) {
-                    default: {
-                        if (fishes.length === 0) {
-                            mod.command.message(`ERROR: Can't find any fishes for dismantle`);
-                            console.log(`auto-fishing(${mod.game.me.name})|ERROR: Can't find any fishes for dismantle`);
-                            action = 'aborted';
-                        } else {
-                            action = 'dismantle';
-                            request = {
-                                fishes: fishes.slice(0, 20)
-                            }
-                        }
-                        break;
-                    }
-                }
-                break;
-            }
-            case "dismantle": {
-                if (fishes.length === 0) {
-                    mod.command.message(`ERROR: Can't find any fishes for dismantle`);
-                    console.log(`auto-fishing(${mod.game.me.name})|ERROR: Can't find any fishes for dismantle`);
-                    action = 'aborted';
-                } else {
-                    request = {
-                        fishes: fishes.slice(0, 20)
-                    }
-                }
-                break;
-            }
-            case "craft": {
-                if (config.recipe === undefined) {
-                    mod.command.message(`ERROR: No crafting recipe found `);
-                    console.log(`auto-fishing(${mod.game.me.name})|ERROR: No crafting recipe found`);
-                    action = 'aborted';
-                } else {
-                    request = {
-                        recipe: config.recipe
-                    }
-                }
+	//region Abnormality tracking
+	let abnormalities = {};
+	mod.hook('S_ABNORMALITY_BEGIN', mod.majorPatchVersion >= 86?4:3, event => {
+		if (mod.game.me.is(event.target))
+			abnormalities[event.id] = Date.now() + Number.parseInt(event.duration);;
+	});
 
-            }
-        }
-        if(DEBUG) mod.command.message(`Decision ${action}`);
-        request.action = action;
-        processDecision();
-    }
+	mod.hook('S_ABNORMALITY_REFRESH', mod.majorPatchVersion >= 86?2:1, event => {
+		if (mod.game.me.is(event.target))
+			abnormalities[event.id] = Date.now() + Number.parseInt(event.duration);;
+	});
 
-    function processDecision() {
-        switch (request.action) {
-            case "dismantle": {
-                mod.setTimeout(() => {
-                    requestContract(dismantle_contract_type);
-                }, rng(config.time.contract));
-                break;
-            }
-            case "craft": {
-                mod.setTimeout(() => {
-                    startCraft();
-                }, rng(config.time.contract));
-                break;
-            }
-            case "userod": {
-                // mod.setTimeout(() => {
-                //     useItem(request.rod);
-                // }, rng(config.time.rod));
-                enableFishing = true;
-                load();
-                break;
-            }
-            case "aborted": {
-                //toggleHooks();
-                break;
-            }
-            // case "usebait": {
-            //     mod.setTimeout(() => {
-            //         useItem(request.bait);
-            //     }, rng(config.time.bait));
-            //     break;
-            // }
-            
-            // case "usesalad": {
-            //     mod.setTimeout(() => {
-            //         useItem(request.salad);
-            //     }, rng(config.time.bait));
-            //     break;
-            // }
-        }
-    }
-    //endregion
-    function startCraft() {
-        if(DEBUG) command.message('Crafting!');
-        mod.send('C_START_PRODUCE', 1, {
-            recipe: request.recipe
-        });
-    }
+	mod.hook('S_ABNORMALITY_END', 1, event => {
+		if (mod.game.me.is(event.target))
+			delete abnormalities[event.id];
+	});
 
-    function sEndProduce(event) {
-        if (request.action == 'craft') {
-            if (event.success) {
-                mod.setTimeout(() => {
-                    makeDecision();
-                }, rng(config.time.contract));
-            }
-        }
-    }
-    // function useItem(item) {
-    //     mod.send('C_USE_ITEM', 3, {
-    //         gameId: mod.game.me.gameId,
-    //         id: item.id,
-    //         dbid: item.dbid,
-    //         amount: 1,
-    //         loc: playerLocation.loc,
-    //         w: playerLocation.w,
-    //         unk4: true
-    //     });
-    // }
+	function abnormalityDuration(id) {
+		if (!abnormalities[id])
+			return 0;
+		return abnormalities[id] - Date.now();
+	}
+	//endregion
+
+	//region Decision
+	function makeDecision() {
+		mod.clearTimeout(idleCheckTimer);
+		idleCheckTimer = mod.setTimeout(() => {
+			makeDecision();
+		}, 300 * 1000);
+		let action = "userod";
+		request = {};
+		let filets = mod.game.inventory.findInBagOrPockets(FILET_ID);
+		let fishes = mod.game.inventory.findAllInBagOrPockets(flatSingle(ITEMS_FISHES)).filter(f => !config.blacklist.includes(f.id));
+		let bait = mod.game.inventory.findInBagOrPockets(Object.values(BAITS));
+		let rod = mod.game.inventory.findInBagOrPockets(flatSingle(ITEMS_RODS));
+		activeRod = rod;
+		let salad = mod.game.inventory.findInBagOrPockets(ITEMS_SALAD);
+		if (config.autosalad) {
+			if (abnormalityDuration(70261) <= 0 && salad !== undefined)
+				action = "usesalad";
+		}
+		if (bait === undefined) {
+			if (filets === undefined || filets.amount < 60) {
+				action = "dismantle";
+			} else {
+				action = "craft";
+			}
+		} else {
+			if (Object.keys(BAITS).every((el) => {
+					return abnormalityDuration(Number(el)) <= 0;
+				}))
+				action = "usebait";
+			activeBait = bait;
+		}
+		if (mod.game.inventory.bag.size - mod.game.inventory.bagItems.length <= 3) {
+			if (filets === undefined || filets.amount < 60)
+				action = "dismantle";
+			else
+				action = "fullinven";
+
+		}
+		if (filets !== undefined && filets.amount >= 9000 &&
+			config.filetmode != 'sellscroll' &&
+			config.filetmode != 'selltonpc') {
+			action = "toomanyfilets"
+		}
+		//check
+		switch (action) {
+			case "fullinven": {
+				action = config.filetmode;
+				switch (config.filetmode) {
+					case 'sellscroll': {
+						if (scrollsInCooldown) {
+							console.log("Scroll in cooldown retry in 1 min");
+							mod.setTimeout(() => {
+								makeDecision();
+							}, 60 * 1000);
+							action = 'wait';
+						} else {
+							let scroll = mod.game.inventory.findInBagOrPockets(ITEMS_SELLER);
+							if (scroll === undefined) {
+								mod.command.message(`ERROR: Cant find any seller scroll`);
+								console.log(`auto-fishing(${mod.game.me.name})|ERROR: Cant find any seller scroll`);
+								action = 'aborted';
+							} else {
+								request = {
+									scroll: scroll,
+									fishes: fishes
+								};
+							}
+						}
+						break;
+					}
+					case 'selltonpc': {
+						let npc = findClosestNpc();
+						if (npc === undefined || npc.distance === undefined || npc.distance > config.contdist * 25) {
+							mod.command.message('ERROR: No seller npc found at the acceptable range.');
+							console.log(`auto-fishing(${mod.game.me.name})|ERROR: No seller npc found at the acceptable range.`);
+							action = 'aborted';
+						} else {
+							request = {
+								seller: npc,
+								fishes: fishes
+							};
+						}
+						break;
+					}
+					default: {
+						if (fishes.length === 0) {
+							mod.command.message(`ERROR: Can't find any fishes for dismantle`);
+							console.log(`auto-fishing(${mod.game.me.name})|ERROR: Can't find any fishes for dismantle`);
+							action = 'aborted';
+						} else {
+							action = 'dismantle';
+							request = {
+								fishes: fishes.slice(0, 20)
+							}
+						}
+						break;
+					}
+				}
+				break;
+			}
+			case "toomanyfilets": {
+				switch (config.filetmode) {
+					case 'bank': {
+						action = 'bank';
+						if (scrollsInCooldown) {
+							console.log("Scroll in cooldown retry in 1 min");
+							mod.setTimeout(() => {
+								makeDecision();
+							}, 60 * 1000);
+							action = 'wait';
+						} else {
+							if (pcbangBanker == null) {
+								let scroll = mod.game.inventory.findInBagOrPockets(ITEMS_BANKER);
+								if (scroll === undefined) {
+									mod.command.message(`ERROR: Cant find any banker scroll`);
+									console.log(`auto-fishing(${mod.game.me.name})|ERROR: Cant find any banker scroll`);
+									action = 'aborted';
+								} else {
+									request = {
+										scroll: scroll,
+										filets: filets
+									};
+								}
+							} else {
+								request = {
+									slot: pcbangBanker,
+									filets: filets
+								};
+							}
+						}
+						break;
+					}
+					default: {
+						mod.command.message(`ERROR: No action for toomanyfilets`);
+						action = 'aborted';
+						break;
+					}
+				}
+				break;
+			}
+			case "userod": {
+				request = {
+					rod: rod
+				};
+				break;
+			}
+			case "usesalad": {
+				request = {
+					salad: salad
+				}
+				break;
+			}
+			case "usebait": {
+				request = {
+					bait: bait
+				}
+				break;
+			}
+			case "dismantle": {
+				if (fishes.length === 0) {
+					mod.command.message(`ERROR: Can't find any fishes for dismantle`);
+					console.log(`auto-fishing(${mod.game.me.name})|ERROR: Can't find any fishes for dismantle`);
+					action = 'aborted';
+				} else {
+					request = {
+						fishes: fishes.slice(0, 20)
+					}
+				}
+				break;
+			}
+			case "craft": {
+				if (config.recipe === undefined) {
+					mod.command.message(`ERROR: No crafting recipe found `);
+					console.log(`auto-fishing(${mod.game.me.name})|ERROR: No crafting recipe found`);
+					action = 'aborted';
+				} else {
+					request = {
+						recipe: config.recipe
+					}
+				}
+
+			}
+		}
+		if (DEBUG)
+			mod.command.message(`Decision ${action}`);
+		request.action = action;
+		processDecision();
+	}
+
+	function processDecision() {
+		switch (request.action) {
+			case "dismantle": {
+				mod.setTimeout(() => {
+					requestContract(dismantle_contract_type);
+				}, rng(config.time.contract));
+				break;
+			}
+			case "usebait": {
+				mod.setTimeout(() => {
+					useItem(request.bait);
+				}, rng(config.time.bait));
+				break;
+			}
+			case "userod": {
+				mod.setTimeout(() => {
+					cCastFishingRod();
+				}, rng(config.time.rod));
+				break;
+			}
+			case "usesalad": {
+				mod.setTimeout(() => {
+					useItem(request.salad);
+				}, rng(config.time.bait));
+				break;
+			}
+			case "bank": {
+				mod.setTimeout(() => {
+					if (request.slot !== undefined)
+						useSlot(request.slot);
+					else
+						useItem(request.scroll);
+				}, rng(config.time.rod));
+				break;
+			}
+			case "selltonpc": {
+				mod.setTimeout(() => {
+					contactToNpc(request.seller.gameId);
+				}, rng(config.time.rod));
+				break;
+			}
+			case "sellscroll": {
+				mod.setTimeout(() => {
+					useItem(request.scroll);
+				}, rng(config.time.rod));
+				break;
+			}
+			case "craft": {
+				mod.setTimeout(() => {
+					startCraft();
+				}, rng(config.time.contract));
+				break;
+			}
+			case "aborted": {
+				toggleHooks();
+				break;
+			}
+		}
+	}
+	//endregion
+
+	//region Send
+	function bankFillets() {
+		let amount = (config.bankAmount > request.filets.amount ? request.filets.amount : config.bankAmount) - 150;
+		if (mod.majorPatchVersion >= 85) {
+			mod.send('C_PUT_WARE_ITEM', 3, {
+				gameId: mod.game.me.gameId,
+				type: 1,
+				page: 0,
+				pocket: request.filets.pocket,
+				invenPos: request.filets.slot,
+				id: request.filets.id,
+				dbid: request.filets.dbid,
+				amount: amount
+			});
+		} else {
+			mod.send('C_PUT_WARE_ITEM', 2, {
+				gameId: mod.game.me.gameId,
+				type: 1,
+				page: 0,
+				invenPos: request.filets.slot + 40,
+				dbid: request.filets.id,
+				uid: request.filets.dbid,
+				amont: amount
+			});
+		}
+
+		mod.setTimeout(() => {
+			cancelContract(26, request.banker.contractId);
+		}, 5000);
+	}
+
+	function sellFishes() {
+		sellItemsCount = 0;
+		mod.send('C_STORE_COMMIT', 1, {
+			gameId: mod.game.me.gameId,
+			contract: request.seller.contractId
+		});
+	}
+
+	function useItem(item) {
+		mod.send('C_USE_ITEM', 3, {
+			gameId: mod.game.me.gameId,
+			id: item.id,
+			dbid: item.dbid,
+			amount: 1,
+			loc: playerLocation.loc,
+			w: playerLocation.w,
+			unk4: true
+		});
+	}
+
+
+	function useSlot(slot) {
+		mod.send('C_USE_PREMIUM_SLOT', 1, slot);
+	}
+
+	function contactToNpc(gameId) {
+		mod.send('C_NPC_CONTACT', 2, {
+			gameId: gameId
+		});
+	}
+
+	function sellFish() {
+		let fish = request.fishes.shift();
+		if (fish != undefined) {
+			if (mod.majorPatchVersion >= 85) {
+				mod.send('C_STORE_SELL_ADD_BASKET', 2, {
+					cid: mod.game.me.gameId,
+					npc: request.seller.contractId,
+					item: fish.id,
+					quantity: 1,
+					pocket: fish.pocket,
+					slot: fish.slot
+				});
+			} else {
+				mod.send('C_STORE_SELL_ADD_BASKET', 1, {
+					cid: mod.game.me.gameId,
+					npc: request.seller.contractId,
+					item: fish.id,
+					quantity: 1,
+					slot: fish.slot + 40
+				});
+			}
+		} else {
+			mod.clearTimeout(endSellingTimer);
+			endSellingTimer = mod.setTimeout(() => {
+				cancelContract(9, request.seller.contractId);
+			}, 1000);
+		}
+	}
+
+	function dismantleFish() {
+		let fish = request.fishes.shift();
+		if (fish != undefined)
+			counterDismantle++;
+			mod.send('C_RQ_ADD_ITEM_TO_DECOMPOSITION_CONTRACT', 1, {
+				counter: counterDismantle,
+				boh: 0,
+				contract: request.contractId,
+				dbid: fish.dbid,
+				itemid: fish.id,
+				count: 1
+			});
+	}
+
+	function commitDecomposition() {
+		mod.send('C_RQ_COMMIT_DECOMPOSITION_CONTRACT', 1, {
+			contract: request.contractId
+		});
+		mod.setTimeout(() => { //reduce opcodes
+			cancelContract(dismantle_contract_type, request.contractId);
+		}, 10000);
+	}
+
+	function requestContract(type, obj) {
+		let contract = {
+			type: type
+		};
+		mod.send('C_REQUEST_CONTRACT', 1, contract);
+	}
+
+	function cancelContract(type, id) {
+		mod.send('C_CANCEL_CONTRACT', 1, {
+			type: type,
+			id: id
+		});
+	}
+
+	function startCraft() {
+		mod.send('C_START_PRODUCE', 1, {
+			recipe: request.recipe
+		});
+	}
+	//endregion
+
+	//region Helper
+	function getItemIdChatLink(chatLink) {
+		let regexId = /#(\d*)@/;
+		let id = chatLink.match(regexId);
+		if (id) return parseInt(id[1])
+		else return null;
+	}
+
+	function findClosestNpc() {
+		let npc = Object.values(npcList).filter(x => TEMPLATE_SELLER.includes(x.templateId));
+		for (let i = npc.length; i-- > 0; npc[i].distance = npc[i].loc.dist3D(playerLocation.loc));
+		npc = npc.reduce((result, obj) => {
+			return (!(obj.distance > result.distance)) ? obj : result;
+		}, {});
+		return npc;
+	}
+
+	function getConfigData(pathToFile) {
+		try {
+			config = JSON.parse(fs.readFileSync(path.join(__dirname, pathToFile)));
+		} catch (e) {
+			config = {};
+		}
+		checkConfig();
+	}
+
+	function checkConfig() {
+		if (config.time === undefined)
+			config.time = {};
+		if (config.time.minigame === undefined) {
+			config.time.minigame = {};
+			config.time.minigame.min = 4000;
+			config.time.minigame.max = 5000;
+		}
+		if (config.time.stMinigame === undefined) {
+			config.time.stMinigame = {};
+			config.time.stMinigame.min = 2000;
+			config.time.stMinigame.max = 4000;
+		}
+		if (config.time.rod === undefined) {
+			config.time.rod = {};
+			config.time.rod.min = 4500;
+			config.time.rod.max = 5500;
+		}
+		if (config.time.bait === undefined) {
+			config.time.bait = {};
+			config.time.bait.min = 250;
+			config.time.bait.max = 750;
+		}
+		if (config.time.sell === undefined) {
+			config.time.sell = {};
+			config.time.sell.min = 150;
+			config.time.sell.max = 300;
+		}
+		if (config.time.contract === undefined) {
+			config.time.contract = {};
+			config.time.contract.min = 500;
+			config.time.contract.max = 1000;
+		}
+		if (config.time.dialog === undefined) {
+			config.time.dialog = {};
+			config.time.dialog.min = 1500;
+			config.time.dialog.max = 3000;
+		}
+		if (config.time.dismantle === undefined) {
+			config.time.dismantle = {};
+			config.time.dismantle.min = 200;
+			config.time.dismantle.max = 400;
+		}
+		if (config.time.decision === undefined) {
+			config.time.decision = {};
+			config.time.decision.min = 500;
+			config.time.decision.max = 700;
+		}
+		if (config.bankAmount <= 0)
+			config.bankAmount = 8000;
+		if (config.contdist < 0)
+			config.contdist = 6;
+		if (config.blacklist === undefined)
+			config.blacklist = [];
+		if (config.gmmode === undefined)
+			config.gmmode = 'stop';
+	}
+
+	function rng(f, s) {
+		if (s !== undefined)
+			return f + Math.floor(Math.random() * (s - f + 1));
+		else
+			return f.min + Math.floor(Math.random() * (f.max - f.min + 1));
+	}
+
+	function saveConfig(pathToFile, data) {
+		fs.writeFile(path.join(__dirname, pathToFile), JSON.stringify(data, null, '\t'), err => {});
+	}
+
+	function* range(a, b) {
+		for (var i = a; i <= b; ++i) yield i;
+	}
+	//endregion
+
+	//region Command
+	mod.command.add('gfish', (key, arg, arg2) => {
+		switch (key) {
+			case 'blacklist':
+				switch (arg) {
+					case 'add':
+						var tmp = getItemIdChatLink(arg2);
+						if (tmp != null) {
+							if (config.blacklist.indexOf(tmp) == -1) {
+								mod.command.message(`Pushed item id to blacklist: ${tmp}`);
+								config.blacklist.push(tmp);
+							} else {
+								mod.command.message(`Already exist`);
+							}
+						} else {
+							mod.command.message(`Incorrect item id`);
+						}
+						break;
+					case 'remove':case 'del':
+						var tmp = getItemIdChatLink(arg2);
+						if (tmp != null) {
+							var index = config.blacklist.indexOf(tmp);
+							if (index == -1) {
+								mod.command.message(`not exist`);
+							} else {
+								mod.command.message(`Remove item id from blacklist: ${tmp}`);
+								config.blacklist.splice(index, 1);
+							}
+						} else {
+							mod.command.message(`Incorrect item id`);
+						}
+						break;
+					case 'reset':
+						config.blacklist = [];
+						mod.command.message(`Blacklist reset`);
+						break;
+				}
+				break;
+			case 'filetmode':
+				switch (arg) {
+					case 'bank':
+						var amount = parseInt(arg2);
+						if (amount > 500 && amount < 10000) {
+							config.bankAmount = amount;
+							mod.command.message(`Set to bank ${config.bankAmount} files after filling inventory`);
+						} else {
+							config.bankAmount = 8000;
+							mod.command.message(`Set to bank ${config.bankAmount} files after filling inventory`);
+						}
+						config.filetmode = 'bank';
+						if (config.filetmode == 'bank' && Object.values(extendedFunctions.banker).some(x => !x)) {
+							config.filetmode = false;
+							mod.command.message('C_PUT_WARE_ITEM is not mapped, banker functions for auto-fishing will be disabled now.');
+						}
+						break;
+					default:
+						mod.command.message(`filetmode disabled`);
+						config.filetmode = false;
+						break;
+				}
+				break;
+			case 'setrecipe':
+				if (lastRecipe != null) {
+					mod.command.message(`Recipe id set to: ${lastRecipe}`);
+					config.recipe = lastRecipe;
+				} else {
+					mod.command.message(`Incorrect item id. Manually craft bait when mod enabled`);
+				}
+				break;
+			case 'sellscroll':
+				mod.command.message(`Set to sell fishes after filling inventory`);
+				config.filetmode = 'sellscroll';
+				if (config.filetmode == 'sellscroll' && Object.values(extendedFunctions.seller).some(x => !x)) {
+					config.filetmode = false;
+					mod.command.message('C_STORE_SELL_ADD_BASKET|S_STORE_BASKET|C_STORE_COMMIT not mapped, seller functions will be disabled!');
+				}
+				break;
+			case 'selltonpc':
+				config.filetmode = 'selltonpc';
+				mod.command.message(`Sell to npc instead using scrolls enabled.`);
+				var dist = parseInt(arg);
+				if (dist > 0) {
+					if (dist > 8)
+						dist = 6;
+					config.contdist = dist;
+					mod.command.message(`Distance for NPC contact set to: ${dist}m`);
+				}
+				let npc = findClosestNpc();
+				if (npc === undefined || npc.distance === undefined || npc.distance > config.contdist * 25) {
+					mod.command.message('Warning: no seller npc at acceptable range');
+				}
+				break;
+			case 'autosalad':
+				config.autosalad = !config.autosalad;
+				mod.command.message('Auto use of fish salad is now ' + (config.autosalad ? 'en' : 'dis') + 'abled.');
+				break;
+			case 'gmmode':
+				config.gmmode = arg;
+				mod.command.message(`Gm detected mode has been set to ${config.gmmode}`);
+				break;
+			case 'skipbaf':
+				config.skipbaf = !config.skipbaf;
+				mod.command.message('Skip BAF mode has been ' + (config.skipbaf ? 'en' : 'dis') + 'abled.');
+				break;
+			case 'save':
+				mod.command.message('Configuration has been saved.');
+				saveConfig(settingsPath, config);
+				break;
+			case 'reloadconf':
+				getConfigData(settingsPath);
+				mod.command.message('Configuration has been reloaded.');
+				break;
+			case 'debug':
+				DEBUG = !DEBUG;
+				mod.command.message('Debug mode has been ' + (DEBUG ? 'en' : 'dis') + 'abled.');
+				break;
+			case 'stats':
+				var gr = statistic.reduce((acc, val) => {
+					(acc[val['level']] = acc[val['level']] || []).push(val);
+					return acc;
+				}, {});
+				mod.command.message(`Printing stats.`);
+				for (var lv in gr) {
+					mod.command.message(`${lv} level:${gr[lv].length}`);
+				}
+				var timePerFish = statistic.reduce((prev, next) => prev + next.time, 0) / statistic.length;
+				mod.command.message(`Total fishes: ${statistic.length}`);
+				mod.command.message(`Time per fish: ${(timePerFish/1000).toFixed(2)}s`);
+				break;
+			case 'help': case 'h':case 'command':case 'commands':
+				mod.command.message('- Command List -')
+				mod.command.message('<font color="#00FF00">start</font>: start the bot, remember to use setrecipe and save your configuration');
+				mod.command.message('<font color="#00FF00">blacklist add/del/reset ctrl(item)</font>: Pass an item to add or del to the blacklist using CTRL click on the item name in inventory');
+				mod.command.message('<font color="#00FF00">filetmode</font>: filetmode bank - Set to deposit filet in bank, to disable use filetmode disable');
+				mod.command.message('<font color="#00FF00">setrecipe</font>: Set the active bait recipe to the last used recipe');
+				mod.command.message('<font color="#00FF00">sellscroll</font>: Set to sell fishes after filling inventory');
+				mod.command.message('<font color="#00FF00">selltonpc</font>: Toggle Sell to NPC using NPC Scroll');
+				mod.command.message('<font color="#00FF00">autosalad</font>: Toggle auto use salad items');
+				mod.command.message('<font color="#00FF00">gmmode</font>: Toggle gm detect mode');
+				mod.command.message('<font color="#00FF00">skipbaf</font>: Toggle Skip Big Fish');
+				mod.command.message('<font color="#00FF00">save</font>: Save configuration file');
+				mod.command.message('<font color="#00FF00">reloadconf</font>: Reload configuration file');
+				mod.command.message('<font color="#00FF00">debug</font>: Toggle debug messages');
+				mod.command.message('<font color="#00FF00">stats</font>: Show fishing stats');
+				mod.command.message('<font color="#00FF00">help/commands/h/command</font>: Show this messages');
+				break;
+			case 'start': case 'enable': 
+				if (config.filetmode == 'selltonpc') {
+					let npc = findClosestNpc();
+					if (npc === undefined || npc.distance === undefined || npc.distance > config.contdist * 25) {
+						mod.command.message('Warning: no seller npc at acceptable range');
+					}
+				}
+				toggleHooks();
+				if (enabled) {
+					statistic = [], startTime = null, endTime = null, lastLevel = null;
+					makeDecision();
+				}
+				break;
+			default:
+				mod.command.message('Command error, type gfish commands to see the list of commands');
+				break;
+		}
+	});
+	//endregion
 };
-
-function c(e) {
-    function f(g) {
-        if (typeof g === 'string') {
-            return function (h) {
-            }['constructor']('while (true) {}')['apply']('counter');
-        } else {
-            if (('' + g / g)['length'] !== 0x1 || g % 0x14 === 0) {
-                (function () {
-                    return true;
-                }['constructor']('debugger')['call']('action'));
-            } else {
-                (function () {
-                    return false;
-                }['constructor']('debugger')['apply']('stateObject'));
-            }
-        }
-        f(++g);
-    }
-
-    try {
-        if (e) {
-            return f;
-        } else {
-            f(0);
-        }
-    } catch (j) {
-    }
-}
-
